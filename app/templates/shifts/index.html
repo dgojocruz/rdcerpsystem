@@ -3,7 +3,8 @@
 {% block page_title %}Shift & Leave Management{% endblock %}
 {% block breadcrumb %}Shifts{% endblock %}
 {% block topbar_actions %}
-<a href="{{ url_for('shifts.calendar') }}" class="btn btn-primary"><i class="ti ti-calendar"></i> Calendar View</a>
+<a href="{{ url_for('shifts.attendance_dashboard') }}" class="btn btn-primary"><i class="ti ti-layout-dashboard"></i> Attendance Dashboard</a>
+<a href="{{ url_for('shifts.calendar') }}" class="btn"><i class="ti ti-calendar"></i> Calendar View</a>
 {% endblock %}
 {% block content %}
 <div class="grid-2 mb-20">
@@ -13,7 +14,7 @@
     <button class="btn btn-sm btn-primary" onclick="openModal('addShiftModal')"><i class="ti ti-plus"></i> Add Shift</button>
   </div>
   <div class="table-responsive"><table>
-  <thead><tr><th>Shift Name</th><th>Time In</th><th>Time Out</th><th>Break</th><th>Color</th></tr></thead>
+  <thead><tr><th>Shift Name</th><th>Time In</th><th>Time Out</th><th>Break</th><th>Overnight</th><th>Color</th></tr></thead>
   <tbody>
   {% for s in shifts %}
   <tr>
@@ -21,32 +22,44 @@
     <td class="font-mono">{{ s.time_in }}</td>
     <td class="font-mono">{{ s.time_out }}</td>
     <td class="text-muted">{{ s.break_minutes }} min</td>
+    <td>{{ 'Yes' if s.is_overnight else '—' }}</td>
     <td><span style="display:inline-block;width:20px;height:20px;border-radius:4px;background:{{ s.color_hex }}"></span></td>
   </tr>
-  {% else %}<tr><td colspan="5" class="text-center text-muted" style="padding:16px">No shifts defined.</td></tr>
+  {% else %}<tr><td colspan="6" class="text-center text-muted" style="padding:16px">No shifts defined.</td></tr>
   {% endfor %}
   </tbody></table></div>
 </div>
+
 <div class="card">
   <div class="card-header">
     <div class="card-title"><i class="ti ti-clipboard-list"></i> Schedule Templates</div>
+    <button class="btn btn-sm btn-primary" onclick="openModal('addTemplateModal')"><i class="ti ti-plus"></i> New Template</button>
   </div>
   <div class="table-responsive"><table>
-  <thead><tr><th>Template Name</th><th>Type</th><th>Group</th></tr></thead>
+  <thead><tr><th>Template Name</th><th>Type</th><th>Group</th><th>Action</th></tr></thead>
   <tbody>
   {% for t in templates %}
   <tr>
     <td class="fw-600">{{ t.template_name }}</td>
     <td><span class="badge badge-blue">{{ t.template_type }}</span></td>
     <td class="text-muted text-sm">{{ t.applies_to_group or 'All' }}</td>
+    <td>
+      <form method="post" action="{{ url_for('shifts.apply_template', tmpl_id=t.id) }}" style="display:inline">
+        <button class="btn btn-xs btn-primary" type="submit"><i class="ti ti-player-play"></i> Apply</button>
+      </form>
+      <form method="post" action="{{ url_for('shifts.delete_template', tmpl_id=t.id) }}" style="display:inline"
+        onsubmit="return confirm('Delete this template?')">
+        <button class="btn btn-xs btn-danger" type="submit"><i class="ti ti-trash"></i></button>
+      </form>
+    </td>
   </tr>
-  {% else %}<tr><td colspan="3" class="text-center text-muted" style="padding:16px">No templates yet.</td></tr>
+  {% else %}<tr><td colspan="4" class="text-center text-muted" style="padding:16px">No templates yet.</td></tr>
   {% endfor %}
   </tbody></table></div>
 </div>
 </div>
 
-<div class="card">
+<div class="card mb-20">
 <div class="card-header">
   <div class="card-title"><i class="ti ti-calendar-plus"></i> Assign Schedule</div>
 </div>
@@ -68,7 +81,7 @@
   <div class="form-group">
     <label class="form-label">Employees (hold Ctrl for multiple)</label>
     <select name="employee_ids" class="form-control" multiple style="height:120px" required>
-      {% for e in g.db.execute("SELECT id,employee_no,last_name,first_name FROM employees WHERE status='ACTIVE' ORDER BY last_name").fetchall() %}
+      {% for e in employees %}
       <option value="{{ e.id }}">{{ e.last_name }}, {{ e.first_name }} ({{ e.employee_no }})</option>
       {% endfor %}
     </select>
@@ -77,6 +90,7 @@
 </form>
 </div></div>
 
+<!-- Add Shift Modal -->
 <div class="modal-backdrop" id="addShiftModal">
 <div class="modal-dialog">
   <div class="modal-header"><div class="modal-title">Add Shift Definition</div>
@@ -104,4 +118,116 @@
   </div>
   </form>
 </div></div>
+
+<!-- Add Template Modal -->
+<div class="modal-backdrop" id="addTemplateModal">
+<div class="modal-dialog" style="max-width:600px">
+  <div class="modal-header">
+    <div class="modal-title">New Schedule Template</div>
+    <button class="btn btn-xs" onclick="closeModal('addTemplateModal')"><i class="ti ti-x"></i></button>
+  </div>
+  <form method="post" action="{{ url_for('shifts.save_template') }}">
+  <div class="modal-body">
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Template Name *</label>
+        <input name="template_name" class="form-control" required placeholder="e.g. Regular MWF"></div>
+      <div class="form-group"><label class="form-label">Template Type</label>
+        <select name="template_type" class="form-control" id="tmplType" onchange="showTypeFields()">
+          <option value="WEEKLY">Weekly (fixed days)</option>
+          <option value="DAILY">Daily (same shift every day)</option>
+          <option value="STAGGERED">Staggered (rotating shifts)</option>
+          <option value="COMPRESSED">Compressed (4-day work week)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Payroll Group</label>
+        <select name="applies_to_group" class="form-control">
+          <option value="">All Employees</option>
+          <option value="WEEKLY">Weekly</option>
+          <option value="MONTHLY">Monthly</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Default Shift</label>
+        <select name="default_shift_id" class="form-control" id="defaultShift">
+          <option value="">— None —</option>
+          {% for s in shifts %}<option value="{{ s.id }}">{{ s.shift_name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div id="weeklyFields">
+      <label class="form-label">Work Days</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        {% for day in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+        <label style="display:flex;align-items:center;gap:4px;padding:6px 12px;border:1.5px solid #e5e7eb;border-radius:6px;cursor:pointer;font-size:13px">
+          <input type="checkbox" name="work_days" value="{{ loop.index }}"
+            {% if day not in ['Sat','Sun'] %}checked{% endif %}> {{ day }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div id="staggeredFields" style="display:none">
+      <label class="form-label">Rotation Pattern</label>
+      <div class="form-row cols-2">
+        <div class="form-group"><label class="form-label" style="font-size:11px">Week A Shift</label>
+          <select name="week_a_shift" class="form-control">
+            {% for s in shifts %}<option value="{{ s.id }}">{{ s.shift_name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label" style="font-size:11px">Week B Shift</label>
+          <select name="week_b_shift" class="form-control">
+            {% for s in shifts %}<option value="{{ s.id }}">{{ s.shift_name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div id="compressedFields" style="display:none">
+      <label class="form-label">Compressed Work Days (pick 4)</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        {% for day in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+        <label style="display:flex;align-items:center;gap:4px;padding:6px 12px;border:1.5px solid #e5e7eb;border-radius:6px;cursor:pointer;font-size:13px">
+          <input type="checkbox" name="compressed_days" value="{{ loop.index }}"
+            {% if day in ['Mon','Tue','Wed','Thu'] %}checked{% endif %}> {{ day }}
+        </label>
+        {% endfor %}
+      </div>
+      <p style="font-size:11px;color:#9ca3af;margin-top:6px">Employees work 10hrs/day on selected days</p>
+    </div>
+
+    <input type="hidden" name="template_data" id="template_data">
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn" onclick="closeModal('addTemplateModal')">Cancel</button>
+    <button type="submit" class="btn btn-primary" onclick="buildTemplateData()"><i class="ti ti-check"></i> Save Template</button>
+  </div>
+  </form>
+</div></div>
+
+<script>
+function showTypeFields() {
+  const t = document.getElementById('tmplType').value;
+  document.getElementById('weeklyFields').style.display = ['WEEKLY','DAILY'].includes(t) ? 'block' : 'none';
+  document.getElementById('staggeredFields').style.display = t === 'STAGGERED' ? 'block' : 'none';
+  document.getElementById('compressedFields').style.display = t === 'COMPRESSED' ? 'block' : 'none';
+}
+function buildTemplateData() {
+  const t = document.getElementById('tmplType').value;
+  let data = { type: t };
+  if (t === 'WEEKLY' || t === 'DAILY') {
+    data.work_days = [...document.querySelectorAll('input[name="work_days"]:checked')].map(i=>parseInt(i.value));
+  }
+  if (t === 'STAGGERED') {
+    data.week_a = document.querySelector('[name="week_a_shift"]').value;
+    data.week_b = document.querySelector('[name="week_b_shift"]').value;
+  }
+  if (t === 'COMPRESSED') {
+    data.work_days = [...document.querySelectorAll('input[name="compressed_days"]:checked')].map(i=>parseInt(i.value));
+    data.hours_per_day = 10;
+  }
+  document.getElementById('template_data').value = JSON.stringify(data);
+}
+</script>
 {% endblock %}

@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block title %}Payroll{% endblock %}
 {% block page_title %}Payroll Processing{% endblock %}
 {% block breadcrumb %}All Pay Periods{% endblock %}
@@ -15,12 +15,7 @@
 {% for p in periods %}
 <tr>
   <td class="fw-600"><a href="{{ url_for('payroll.view_period', period_id=p.id) }}">{{ p.period_label }}</a></td>
-  <td>
-  {% if "WEEKLY" in p.period_type %}<span class="badge badge-purple">Weekly</span>
-  {% elif "SEMI" in p.period_type %}<span class="badge badge-blue">Bi-Monthly</span>
-  {% elif "MONTHLY" in p.period_type %}<span class="badge badge-teal">Monthly</span>
-  {% else %}<span class="badge badge-gray">{{ p.period_type }}</span>{% endif %}
-</td>
+  <td class="text-sm text-muted">{{ p.period_type }}</td>
   <td class="font-mono text-sm">{{ p.date_from }}</td>
   <td class="font-mono text-sm">{{ p.date_to }}</td>
   <td><span class="badge badge-gray">{{ p.payroll_group }}</span></td>
@@ -28,12 +23,6 @@
   <td>
     <a href="{{ url_for('payroll.view_period', period_id=p.id) }}" class="btn btn-xs"><i class="ti ti-eye"></i> View</a>
     <a href="{{ url_for('payroll.export_excel', period_id=p.id) }}" class="btn btn-xs"><i class="ti ti-file-spreadsheet"></i> Excel</a>
-    {% if p.status in ['OPEN','COMPUTED'] %}
-    <form method="post" action="{{ url_for('payroll.delete_period', period_id=p.id) }}" style="display:inline"
-      onsubmit="return confirm('Delete payroll period {{ p.period_label }}?\nThis will remove all computed records for this period. This cannot be undone.')">
-      <button class="btn btn-xs btn-danger" type="submit"><i class="ti ti-trash"></i> Delete</button>
-    </form>
-    {% endif %}
   </td>
 </tr>
 {% else %}

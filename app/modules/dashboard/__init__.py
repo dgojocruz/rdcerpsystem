@@ -73,7 +73,7 @@ def fetch_widget_data(widget_type, db):
 def index():
     user_id = session['user']['id']
     widgets = g.db.execute("""SELECT * FROM dashboard_widgets WHERE user_id=? AND is_visible=1
-        ORDER BY position_y, position_x""", (user_id,)).fetchall()
+        ORDER BY COALESCE(position_row,0), COALESCE(position_col,0)""", (user_id,)).fetchall()
     widget_data = {}
     for w in widgets:
         try:
@@ -99,7 +99,7 @@ def save_widgets():
     user_id = session['user']['id']
     layout = request.json.get('layout', [])
     for item in layout:
-        g.db.execute("""UPDATE dashboard_widgets SET position_x=?, position_y=?, width=?, height=?
+        g.db.execute("""UPDATE dashboard_widgets SET position_col=?, position_row=?, width_units=?, is_visible=is_visible
             WHERE id=? AND user_id=?""",
             (item.get('x', 0), item.get('y', 0), item.get('w', 1), item.get('h', 1),
              item['id'], user_id))

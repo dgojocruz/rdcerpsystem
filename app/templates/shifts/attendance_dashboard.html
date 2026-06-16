@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block title %}Attendance Dashboard{% endblock %}
+{% block page_title %}Attendance Dashboard{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('shifts.index') }}">Shifts</a> / Attendance Dashboard{% endblock %}
+{% block topbar_actions %}
+<input type="date" id="dashDate" value="{{ today }}" onchange="loadDashboard()" class="form-control" style="width:160px">
+<select id="deptFilter" class="form-control" style="width:160px" onchange="loadDashboard()">
+  <option value="">All Departments</option>
+  {% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+</select>
+{% endblock %}
+{% block content %}
+
+<div class="stats-grid mb-16" id="statsGrid">
+  <div class="stat-card"><div class="stat-icon blue"><i class="ti ti-users"></i></div><div class="stat-val" id="stat-total">—</div><div class="stat-label">Total Active</div></div>
+  <div class="stat-card"><div class="stat-icon green"><i class="ti ti-circle-check"></i></div><div class="stat-val" id="stat-present">—</div><div class="stat-label">Present</div></div>
+  <div class="stat-card"><div class="stat-icon red"><i class="ti ti-user-off"></i></div><div class="stat-val" id="stat-absent">—</div><div class="stat-label">Absent</div></div>
+  <div class="stat-card"><div class="stat-icon amber"><i class="ti ti-clock"></i></div><div class="stat-val" id="stat-late">—</div><div class="stat-label">Late</div></div>
+  <div class="stat-card"><div class="stat-icon blue"><i class="ti ti-player-play"></i></div><div class="stat-val" id="stat-ot">—</div><div class="stat-label">With OT</div></div>
+  <div class="stat-card"><div class="stat-icon gray"><i class="ti ti-calendar-off"></i></div><div class="stat-val" id="stat-notlogged">—</div><div class="stat-label">Not Logged</div></div>
+</div>
+
+<div class="grid-2 mb-16">
+  <div class="card">
+    <div class="card-header"><div class="card-title"><i class="ti ti-chart-pie"></i> Status Breakdown</div></div>
+    <div class="card-body" style="position:relative;height:220px">
+      <canvas id="statusChart" role="img" aria-label="Attendance status pie chart"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title"><i class="ti ti-chart-bar"></i> By Department</div></div>
+    <div class="card-body" style="position:relative;height:220px">
+      <canvas id="deptChart" role="img" aria-label="Department attendance bar chart"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+    <div class="card-title"><i class="ti ti-fingerprint"></i> Employee Attendance Log</div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="empSearch" placeholder="Search employee..." class="form-control" style="width:200px" oninput="filterTable()">
+      <select id="statusFilter" class="form-control" style="width:140px" onchange="filterTable()">
+        <option value="">All Status</option>
+        <option value="Present">Present</option>
+        <option value="Late">Late</option>
+        <option value="Absent">Absent</option>
+        <option value="OT">With OT</option>
+        <option value="Not Logged">Not Logged</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table style="font-size:13px" id="attTable">
+      <thead>
+        <tr>
+          <th>Employee</th><th>Dept</th><th>Shift</th>
+          <th>Time In</th><th>Time Out</th><th>Hours</th><th>OT</th><th>Late</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="attBody">
+        <tr><td colspan="9" class="text-center text-muted" style="padding:24px">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let statusChart, deptChart, allRows = [];
+
+function loadDashboard() {
+  const date = document.getElementById('dashDate').value;
+  const dept = document.getElementById('deptFilter').value;
+  fetch(`/shifts/api/attendance-dashboard?date=${date}&dept=${dept}`)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('stat-total').textContent = data.stats.total;
+      document.getElementById('stat-present').textContent = data.stats.present;
+      document.getElementById('stat-absent').textContent = data.stats.absent;
+      document.getElementById('stat-late').textContent = data.stats.late;
+      document.getElementById('stat-ot').textContent = data.stats.ot;
+      document.getElementById('stat-notlogged').textContent = data.stats.not_logged;
+      renderStatusChart(data.stats);
+      renderDeptChart(data.by_dept);
+      allRows = data.employees;
+      renderTable(allRows);
+    });
+}
+
+function renderStatusChart(s) {
+  if (statusChart) statusChart.destroy();
+  statusChart = new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Present','Late','Absent','Not Logged'],
+      datasets: [{
+        data: [s.present - s.late, s.late, s.absent, s.not_logged],
+        backgroundColor: ['#16a34a','#d97706','#dc2626','#9ca3af'],
+        borderWidth: 0
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+  });
+}
+
+function renderDeptChart(byDept) {
+  if (deptChart) deptChart.destroy();
+  const labels = byDept.map(d => d.dept);
+  const present = byDept.map(d => d.present);
+  const absent = byDept.map(d => d.absent);
+  const h = Math.max(220, labels.length * 36 + 60);
+  document.getElementById('deptChart').parentElement.style.height = h + 'px';
+  deptChart = new Chart(document.getElementById('deptChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Present', data: present, backgroundColor: '#16a34a' },
+        { label: 'Absent', data: absent, backgroundColor: '#dc2626' }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true } },
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { font: { size: 10 } } } }
+    }
+  });
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('attBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted" style="padding:24px">No data for this date.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const statusColors = { Present:'badge-green', Late:'badge-amber', Absent:'badge-red', OT:'badge-blue', 'Not Logged':'badge-gray' };
+    const rowBg = r.status==='Absent' ? 'background:#fef2f2' : r.status==='Late' ? 'background:#fffbeb' : r.status==='OT' ? 'background:#eff6ff' : '';
+    return `<tr style="${rowBg}" class="att-row" data-name="${r.name.toLowerCase()}" data-status="${r.status}">
+      <td><div class="fw-600">${r.name}</div><div class="text-sm text-muted">${r.emp_no}</div></td>
+      <td class="text-muted text-sm">${r.dept || '—'}</td>
+      <td class="text-sm">${r.shift || '—'}</td>
+      <td class="font-mono">${r.time_in || '—'}</td>
+      <td class="font-mono">${r.time_out || '—'}</td>
+      <td class="font-mono">${r.hours ? r.hours.toFixed(2) : '—'}</td>
+      <td class="font-mono ${r.ot > 0 ? 'text-primary fw-600' : 'text-muted'}">${r.ot > 0 ? r.ot.toFixed(2) : '—'}</td>
+      <td class="${r.late > 0 ? 'text-danger fw-600' : 'text-muted'}">${r.late > 0 ? r.late + 'm' : '—'}</td>
+      <td><span class="badge ${statusColors[r.status] || 'badge-gray'}">${r.status}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterTable() {
+  const q = document.getElementById('empSearch').value.toLowerCase();
+  const s = document.getElementById('statusFilter').value;
+  const filtered = allRows.filter(r =>
+    (!q || r.name.toLowerCase().includes(q)) &&
+    (!s || r.status === s || (s === 'OT' && r.ot > 0))
+  );
+  renderTable(filtered);
+}
+
+loadDashboard();
+</script>
+{% endblock %}

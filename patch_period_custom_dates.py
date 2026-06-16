@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+new_html = '''{% extends 'base.html' %}
 {% block title %}New Pay Period{% endblock %}
 {% block page_title %}New Pay Period{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('payroll.index') }}">Payroll</a> / New Period{% endblock %}
@@ -266,3 +266,7 @@ function saveIncluded() {
 }
 </script>
 {% endblock %}
+'''
+
+open('app/templates/payroll/new_period.html', 'w', encoding='utf-8').write(new_html)
+print("OK: new_period.html rebuilt with custom date selector")

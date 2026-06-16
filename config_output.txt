@@ -1,4 +1,4 @@
-import os
+﻿import os
 import json
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,3 +105,4 @@ def create_client(client_id, company_name, config_overrides=None):
     with open(os.path.join(client_dir, 'config.json'), 'w') as f:
         json.dump(config, f, indent=2)
     return client_dir
+

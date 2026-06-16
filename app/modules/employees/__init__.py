@@ -143,11 +143,26 @@ def view(emp_id):
         AND (? = '' OR strftime('%Y-%m', work_date)=?)
     """, (emp_id, month_filter, month_filter)).fetchone()
 
+    # Schedule history
+    sch_month = request.args.get('sch_month', '')
+    sch_query = """SELECT es.schedule_date, es.is_rest_day, es.schedule_type,
+        sd.shift_name, sd.time_in, sd.time_out, sd.break_minutes, sd.color_hex
+        FROM employee_schedules es
+        LEFT JOIN shift_definitions sd ON es.shift_id=sd.id
+        WHERE es.employee_id=?"""
+    sch_params = [emp_id]
+    if sch_month:
+        sch_query += " AND strftime('%Y-%m', es.schedule_date)=?"
+        sch_params.append(sch_month)
+    sch_query += " ORDER BY es.schedule_date DESC LIMIT 60"
+    schedule_history = g.db.execute(sch_query, sch_params).fetchall()
+
     departments = g.db.execute("SELECT * FROM departments WHERE is_active=1").fetchall()
     return render_template('employees/view.html', emp=emp, loans=loans, leaves=leaves,
                            recent_payroll=recent_payroll, departments=departments,
                            attendance_history=attendance_history, tk_stats=tk_stats,
-                           tk_month=month_filter)
+                           tk_month=month_filter, schedule_history=schedule_history,
+                           sch_month=sch_month)
 
 @bp.route('/<int:emp_id>/edit', methods=['GET','POST'])
 @login_required

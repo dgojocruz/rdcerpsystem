@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+new_html = r'''{% extends 'base.html' %}
 {% block title %}{{ emp.last_name }}, {{ emp.first_name }}{% endblock %}
 {% block page_title %}{{ emp.last_name }}, {{ emp.first_name }}{% endblock %}
 {% block breadcrumb %}<a href="{{ url_for('employees.index') }}">Employees</a> / {{ emp.employee_no }}{% endblock %}
@@ -371,3 +371,123 @@ function toggleCard(id) {
 }
 </script>
 {% endblock %}
+'''
+
+open('app/templates/employees/view.html', 'w', encoding='utf-8').write(new_html)
+print("OK: view.html rebuilt cleanly")
+print("Endblocks:", new_html.count('endblock'))
+
+# ── Patch employees/__init__.py ──────────────────────────────────────────────
+py = open('app/modules/employees/__init__.py', encoding='utf-8').read()
+
+# 1. Update view() to include shifts, audit_log
+old_return = '''    # Schedule history
+    sch_month = request.args.get('sch_month', '')
+    sch_query = """SELECT es.schedule_date, es.is_rest_day, es.schedule_type,
+        sd.shift_name, sd.time_in, sd.time_out, sd.break_minutes, sd.color_hex
+        FROM employee_schedules es
+        LEFT JOIN shift_definitions sd ON es.shift_id=sd.id
+        WHERE es.employee_id=?"""
+    sch_params = [emp_id]
+    if sch_month:
+        sch_query += " AND strftime('%Y-%m', es.schedule_date)=?"
+        sch_params.append(sch_month)
+    sch_query += " ORDER BY es.schedule_date DESC LIMIT 60"
+    schedule_history = g.db.execute(sch_query, sch_params).fetchall()
+
+    departments = g.db.execute("SELECT * FROM departments WHERE is_active=1").fetchall()
+    return render_template('employees/view.html', emp=emp, loans=loans, leaves=leaves,
+                           recent_payroll=recent_payroll, departments=departments,
+                           attendance_history=attendance_history, tk_stats=tk_stats,
+                           tk_month=month_filter, schedule_history=schedule_history,
+                           sch_month=sch_month)'''
+
+new_return = '''    # Schedule history
+    sch_month = request.args.get('sch_month', '')
+    sch_query = """SELECT es.id, es.schedule_date, es.is_rest_day, es.schedule_type,
+        sd.shift_name, sd.time_in, sd.time_out, sd.break_minutes, sd.color_hex
+        FROM employee_schedules es
+        LEFT JOIN shift_definitions sd ON es.shift_id=sd.id
+        WHERE es.employee_id=?"""
+    sch_params = [emp_id]
+    if sch_month:
+        sch_query += " AND strftime('%Y-%m', es.schedule_date)=?"
+        sch_params.append(sch_month)
+    sch_query += " ORDER BY es.schedule_date DESC LIMIT 60"
+    schedule_history = g.db.execute(sch_query, sch_params).fetchall()
+
+    # Shifts list for dropdown
+    shifts = g.db.execute("SELECT * FROM shift_definitions WHERE is_active=1 ORDER BY time_in").fetchall()
+
+    # Audit/change log for this employee
+    audit_log = g.db.execute("""SELECT al.*, u.username as performed_by
+        FROM audit_log al LEFT JOIN users u ON al.user_id=u.id
+        WHERE al.record_id=? AND al.table_name IN ('employee_schedules','employees')
+        ORDER BY al.created_at DESC LIMIT 30""", (emp_id,)).fetchall()
+
+    departments = g.db.execute("SELECT * FROM departments WHERE is_active=1").fetchall()
+    return render_template('employees/view.html', emp=emp, loans=loans, leaves=leaves,
+                           recent_payroll=recent_payroll, departments=departments,
+                           attendance_history=attendance_history, tk_stats=tk_stats,
+                           tk_month=month_filter, schedule_history=schedule_history,
+                           sch_month=sch_month, shifts=shifts, audit_log=audit_log)'''
+
+py = py.replace(old_return, new_return)
+
+# 2. Add new routes at end
+new_routes = '''
+@bp.route('/<int:emp_id>/schedule/assign', methods=['POST'])
+@login_required
+def assign_emp_schedule(emp_id):
+    from datetime import datetime, timedelta
+    f = request.form
+    date_from = datetime.strptime(f['date_from'], '%Y-%m-%d')
+    date_to   = datetime.strptime(f['date_to'],   '%Y-%m-%d')
+    shift_id  = f.get('shift_id') or None
+    is_rest   = int(f.get('is_rest_day', 0))
+    remarks   = f.get('remarks', '')
+    count = 0
+    cur = date_from
+    while cur <= date_to:
+        ds = cur.strftime('%Y-%m-%d')
+        g.db.execute("""INSERT INTO employee_schedules
+            (employee_id, shift_id, schedule_date, is_rest_day, schedule_type)
+            VALUES (?,?,?,?,'REGULAR')
+            ON CONFLICT(employee_id,schedule_date) DO UPDATE SET
+            shift_id=excluded.shift_id, is_rest_day=excluded.is_rest_day""",
+            (emp_id, shift_id, ds, is_rest))
+        count += 1
+        cur += timedelta(days=1)
+    # Log the change
+    try:
+        g.db.execute("""INSERT INTO audit_log (table_name, record_id, action, details, user_id, created_at)
+            VALUES ('employee_schedules', ?, 'SCHEDULE_ADD', ?, 1, datetime('now'))""",
+            (emp_id, f"Assigned {'Rest Day' if is_rest else 'shift '+str(shift_id)} from {f['date_from']} to {f['date_to']} ({count} days). {remarks}"))
+    except:
+        pass
+    g.db.commit()
+    flash(f'{count} schedule entries saved.', 'success')
+    return redirect(url_for('employees.view', emp_id=emp_id))
+
+@bp.route('/<int:emp_id>/schedule/<int:schedule_id>/delete', methods=['POST'])
+@login_required
+def delete_emp_schedule(emp_id, schedule_id):
+    sched = g.db.execute("SELECT * FROM employee_schedules WHERE id=? AND employee_id=?",
+        (schedule_id, emp_id)).fetchone()
+    if sched:
+        g.db.execute("DELETE FROM employee_schedules WHERE id=?", (schedule_id,))
+        try:
+            g.db.execute("""INSERT INTO audit_log (table_name, record_id, action, details, user_id, created_at)
+                VALUES ('employee_schedules', ?, 'SCHEDULE_DEL', ?, 1, datetime('now'))""",
+                (emp_id, f"Deleted schedule entry for {sched['schedule_date']}"))
+        except:
+            pass
+        g.db.commit()
+        flash('Schedule entry deleted.', 'success')
+    return redirect(url_for('employees.view', emp_id=emp_id))
+'''
+
+py = py + new_routes
+open('app/modules/employees/__init__.py', 'w', encoding='utf-8').write(py)
+print("OK: employees/__init__.py updated with schedule routes + audit log")
+print("\nAll done! Restart the server.")

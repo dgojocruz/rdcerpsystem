@@ -243,6 +243,26 @@ def export_excel(period_id):
         download_name=f"payroll_{period['period_label'].replace(' ','_')}.xlsx",
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+
+@bp.route('/period/<int:period_id>/delete', methods=['POST'])
+@login_required
+def delete_period(period_id):
+    period = g.db.execute("SELECT * FROM pay_periods WHERE id=?", (period_id,)).fetchone()
+    if not period:
+        flash("Pay period not found.", "error")
+        return redirect(url_for("payroll.index"))
+    if period["status"] == "RELEASED":
+        flash("Cannot delete a released payroll period.", "error")
+        return redirect(url_for("payroll.index"))
+    if period["status"] == "APPROVED":
+        flash("Cannot delete an approved payroll. Please contact your system administrator.", "error")
+        return redirect(url_for("payroll.index"))
+    label = period["period_label"]
+    g.db.execute("DELETE FROM payroll WHERE pay_period_id=?", (period_id,))
+    g.db.execute("DELETE FROM pay_periods WHERE id=?", (period_id,))
+    g.db.commit()
+    flash(f"Payroll period \"{label}\" and all its records have been deleted.", "success")
+    return redirect(url_for("payroll.index"))
 @bp.route('/config')
 @login_required
 def config():

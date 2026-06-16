@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, g, jsonify, flash
+﻿from flask import Blueprint, render_template, request, redirect, url_for, g, jsonify, flash
 from ..auth import login_required
 import json
 from datetime import datetime, date, timedelta
@@ -10,8 +10,7 @@ bp = Blueprint('shifts', __name__)
 def index():
     shifts = g.db.execute("SELECT * FROM shift_definitions WHERE is_active=1 ORDER BY time_in").fetchall()
     templates = g.db.execute("SELECT * FROM schedule_templates ORDER BY template_name").fetchall()
-    employees = g.db.execute("SELECT id,employee_no,last_name,first_name FROM employees WHERE status='ACTIVE' ORDER BY last_name").fetchall()
-    return render_template('shifts/index.html', shifts=shifts, templates=templates, employees=employees)
+    return render_template('shifts/index.html', shifts=shifts, templates=templates)
 
 @bp.route('/calendar')
 @login_required
@@ -125,112 +124,3 @@ def save_template():
     flash('Template saved.', 'success')
     return redirect(url_for('shifts.index'))
 
-@bp.route('/attendance-dashboard')
-@login_required
-def attendance_dashboard():
-    from datetime import date as dt_date
-    today = dt_date.today().strftime('%Y-%m-%d')
-    departments = g.db.execute("SELECT * FROM departments WHERE is_active=1 ORDER BY name").fetchall()
-    return render_template('shifts/attendance_dashboard.html', today=today, departments=departments)
-
-@bp.route('/api/attendance-dashboard')
-@login_required
-def api_attendance_dashboard():
-    req_date = request.args.get('date', date.today().strftime('%Y-%m-%d'))
-    dept_filter = request.args.get('dept', '')
-
-    emp_query = """SELECT e.id, e.employee_no, e.last_name, e.first_name,
-        d.name as dept_name, sd.shift_name, sd.time_in as sched_in, sd.time_out as sched_out
-        FROM employees e
-        LEFT JOIN departments d ON e.department_id=d.id
-        LEFT JOIN employee_schedules es ON es.employee_id=e.id AND es.schedule_date=?
-        LEFT JOIN shift_definitions sd ON es.shift_id=sd.id
-        WHERE e.status='ACTIVE'"""
-    emp_params = [req_date]
-    if dept_filter:
-        emp_query += " AND e.department_id=?"
-        emp_params.append(dept_filter)
-    emp_query += " ORDER BY e.last_name"
-    employees = g.db.execute(emp_query, emp_params).fetchall()
-
-    att_map = {}
-    att_rows = g.db.execute("""SELECT employee_id, time_in, time_out, total_hours,
-        ot_hours, late_minutes, is_absent FROM attendance WHERE work_date=?""", (req_date,)).fetchall()
-    for a in att_rows:
-        att_map[a['employee_id']] = a
-
-    rows = []
-    stats = {'total':0,'present':0,'absent':0,'late':0,'ot':0,'not_logged':0}
-    dept_map = {}
-
-    for e in employees:
-        stats['total'] += 1
-        a = att_map.get(e['id'])
-        dept = e['dept_name'] or 'Unknown'
-        if dept not in dept_map:
-            dept_map[dept] = {'dept':dept,'present':0,'absent':0}
-
-        if not a:
-            status = 'Not Logged'
-            stats['not_logged'] += 1
-            time_in = time_out = None
-            hours = ot = late = 0
-        elif a['is_absent']:
-            status = 'Absent'
-            stats['absent'] += 1
-            dept_map[dept]['absent'] += 1
-            time_in = time_out = None
-            hours = ot = late = 0
-        else:
-            dept_map[dept]['present'] += 1
-            stats['present'] += 1
-            time_in = a['time_in']
-            time_out = a['time_out']
-            hours = a['total_hours'] or 0
-            ot = a['ot_hours'] or 0
-            late = a['late_minutes'] or 0
-            if late > 0:
-                status = 'Late'
-                stats['late'] += 1
-            elif ot > 0:
-                status = 'OT'
-                stats['ot'] += 1
-            else:
-                status = 'Present'
-
-        rows.append({
-            'emp_no': e['employee_no'],
-            'name': f"{e['last_name']}, {e['first_name']}",
-            'dept': dept,
-            'shift': f"{e['shift_name']} ({e['sched_in']}-{e['sched_out']})" if e['shift_name'] else None,
-            'time_in': time_in,
-            'time_out': time_out,
-            'hours': hours,
-            'ot': ot,
-            'late': late,
-            'status': status
-        })
-
-    return jsonify({
-        'stats': stats,
-        'employees': rows,
-        'by_dept': list(dept_map.values())
-    })
-
-@bp.route('/templates/<int:tmpl_id>/apply', methods=['POST'])
-@login_required
-def apply_template(tmpl_id):
-    tmpl = g.db.execute("SELECT * FROM schedule_templates WHERE id=?", (tmpl_id,)).fetchone()
-    if not tmpl:
-        flash('Template not found.', 'error')
-        return redirect(url_for('shifts.index'))
-    flash(f'Template "{tmpl["template_name"]}" applied. Use Assign Schedule to set dates.', 'info')
-    return redirect(url_for('shifts.index'))
-
-@bp.route('/templates/<int:tmpl_id>/delete', methods=['POST'])
-@login_required
-def delete_template(tmpl_id):
-    g.db.execute("DELETE FROM schedule_templates WHERE id=?", (tmpl_id,))
-    g.db.commit()
-    flash('Template deleted.', 'success')
-    return redirect(url_for('shifts.index'))
