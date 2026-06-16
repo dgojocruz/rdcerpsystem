@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block breadcrumb %}All Reports{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('reports.create') }}" class="btn btn-primary"><i class="ti ti-plus"></i> New Report</a>
+{% endblock %}
+{% block content %}
+{% set module_icons = {'employees':'ti-users','timekeeping':'ti-fingerprint','payroll':'ti-cash','leaves':'ti-calendar-off','loans':'ti-credit-card'} %}
+{% set module_colors = {'employees':'blue','timekeeping':'green','payroll':'amber','leaves':'red','loans':'purple'} %}
+
+{% if not by_module %}
+<div class="card"><div class="card-body text-center" style="padding:48px">
+  <i class="ti ti-chart-bar" style="font-size:48px;color:#d1d5db;display:block;margin-bottom:12px"></i>
+  <div class="fw-600 mb-8">No reports yet</div>
+  <a href="{{ url_for('reports.create') }}" class="btn btn-primary"><i class="ti ti-plus"></i> Create First Report</a>
+</div></div>
+{% endif %}
+
+{% for module, rpts in by_module.items() %}
+<div class="card mb-16">
+<div class="card-header">
+  <div class="card-title">
+    <i class="ti {{ module_icons.get(module,'ti-file') }}" style="color:var(--{{ 'primary' if module_colors.get(module)=='blue' else 'success' if module_colors.get(module)=='green' else 'warning' if module_colors.get(module)=='amber' else 'danger' if module_colors.get(module)=='red' else 'primary' }})"></i>
+    {{ module | capitalize }} Reports
+  </div>
+</div>
+<div class="table-responsive"><table>
+<thead><tr><th>Report Name</th><th>Description</th><th>Chart</th><th>Public</th><th>Actions</th></tr></thead>
+<tbody>
+{% for r in rpts %}
+<tr>
+  <td class="fw-600"><a href="{{ url_for('reports.run_report', report_id=r.id) }}">{{ r.report_name }}</a></td>
+  <td class="text-sm text-muted">{{ r.description or '—' }}</td>
+  <td>{% if r.chart_type != 'none' %}<span class="badge badge-blue">{{ r.chart_type }}</span>{% else %}<span class="text-muted text-sm">table</span>{% endif %}</td>
+  <td>{% if r.is_public %}<span class="badge badge-green">Public</span>{% else %}<span class="badge badge-gray">Private</span>{% endif %}</td>
+  <td>
+    <a href="{{ url_for('reports.run_report', report_id=r.id) }}" class="btn btn-xs btn-primary"><i class="ti ti-player-play"></i> Run</a>
+    <form method="post" action="{{ url_for('reports.export_report', report_id=r.id) }}" style="display:inline">
+      <button type="submit" class="btn btn-xs"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+    </form>
+  </td>
+</tr>
+{% endfor %}
+</tbody></table></div></div>
+{% endfor %}
+{% endblock %}

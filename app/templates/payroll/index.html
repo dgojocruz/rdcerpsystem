@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Payroll{% endblock %}
+{% block page_title %}Payroll Processing{% endblock %}
+{% block breadcrumb %}All Pay Periods{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('payroll.thirteenth_month') }}" class="btn"><i class="ti ti-gift"></i> 13th Month</a>
+<a href="{{ url_for('payroll.new_period') }}" class="btn btn-primary"><i class="ti ti-plus"></i> New Pay Period</a>
+{% endblock %}
+{% block content %}
+<div class="card">
+<div class="card-header"><div class="card-title">Pay Periods</div></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Period</th><th>Type</th><th>Date From</th><th>Date To</th><th>Group</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody>
+{% for p in periods %}
+<tr>
+  <td class="fw-600"><a href="{{ url_for('payroll.view_period', period_id=p.id) }}">{{ p.period_label }}</a></td>
+  <td class="text-sm text-muted">{{ p.period_type }}</td>
+  <td class="font-mono text-sm">{{ p.date_from }}</td>
+  <td class="font-mono text-sm">{{ p.date_to }}</td>
+  <td><span class="badge badge-gray">{{ p.payroll_group }}</span></td>
+  <td><span class="badge badge-{{ 'green' if p.status=='RELEASED' else 'blue' if p.status=='APPROVED' else 'amber' if p.status=='COMPUTED' else 'gray' }}">{{ p.status }}</span></td>
+  <td>
+    <a href="{{ url_for('payroll.view_period', period_id=p.id) }}" class="btn btn-xs"><i class="ti ti-eye"></i> View</a>
+    <a href="{{ url_for('payroll.export_excel', period_id=p.id) }}" class="btn btn-xs"><i class="ti ti-file-spreadsheet"></i> Excel</a>
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="7" class="text-center" style="padding:32px;color:#6b7280">No pay periods yet. <a href="{{ url_for('payroll.new_period') }}">Create one →</a></td></tr>
+{% endfor %}
+</tbody>
+</table></div></div>
+{% endblock %}

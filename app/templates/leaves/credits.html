@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Leave Credits{% endblock %}
+{% block page_title %}Leave Credits{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('leaves.index') }}">Leave</a> / Credits{% endblock %}
+{% block content %}
+<div class="card">
+<div class="card-header"><div class="card-title">Leave Credits — Current Year</div></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Employee</th><th>Leave Type</th><th>Allocated</th><th>Used</th><th>Balance</th></tr></thead>
+<tbody>
+{% for c in credits %}
+<tr>
+  <td><div class="fw-600">{{ c.last_name }}, {{ c.first_name }}</div><div class="text-sm text-muted font-mono">{{ c.employee_no }}</div></td>
+  <td><span class="badge badge-blue">{{ c.leave_type }}</span></td>
+  <td>{{ c.allocated_days }}</td>
+  <td>{{ c.used_days }}</td>
+  <td class="fw-600 {% if c.balance_days <= 0 %}text-danger{% else %}text-success{% endif %}">{{ c.balance_days }}</td>
+</tr>
+{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

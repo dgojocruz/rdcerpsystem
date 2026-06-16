@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}{{ period.period_label }}{% endblock %}
+{% block page_title %}{{ period.period_label }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('payroll.index') }}">Payroll</a> / {{ period.period_label }}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('payroll.export_excel', period_id=period.id) }}" class="btn"><i class="ti ti-file-spreadsheet"></i> Export Excel</a>
+{% if period.status == 'COMPUTED' %}
+<form method="post" action="{{ url_for('payroll.approve', period_id=period.id) }}" style="display:inline">
+  <button class="btn btn-success" type="submit"><i class="ti ti-check"></i> Approve</button>
+</form>
+{% elif period.status == 'APPROVED' %}
+<form method="post" action="{{ url_for('payroll.release', period_id=period.id) }}" style="display:inline">
+  <button class="btn btn-primary" type="submit"><i class="ti ti-send"></i> Release</button>
+</form>
+{% endif %}
+{% if period.status == 'OPEN' %}
+<form method="post" action="{{ url_for('payroll.compute', period_id=period.id) }}" style="display:inline">
+  <button class="btn btn-primary" type="submit"><i class="ti ti-calculator"></i> Compute Payroll</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block content %}
+<div class="stats-grid mb-16">
+<div class="stat-card"><div class="stat-icon blue"><i class="ti ti-users"></i></div><div class="stat-val">{{ totals.count or 0 }}</div><div class="stat-label">Employees</div></div>
+<div class="stat-card"><div class="stat-icon green"><i class="ti ti-trending-up"></i></div><div class="stat-val">₱{{ "{:,.2f}".format(totals.gross or 0) }}</div><div class="stat-label">Total Gross</div></div>
+<div class="stat-card"><div class="stat-icon red"><i class="ti ti-trending-down"></i></div><div class="stat-val">₱{{ "{:,.2f}".format(totals.deductions or 0) }}</div><div class="stat-label">Total Deductions</div></div>
+<div class="stat-card"><div class="stat-icon blue"><i class="ti ti-cash"></i></div><div class="stat-val">₱{{ "{:,.2f}".format(totals.net or 0) }}</div><div class="stat-label">Total Net Pay</div></div>
+</div>
+<div class="card">
+<div class="card-header">
+  <div class="card-title">Payroll Register — <span class="badge badge-{{ 'green' if period.status=='RELEASED' else 'blue' if period.status=='APPROVED' else 'amber' }}">{{ period.status }}</span></div>
+</div>
+<div class="table-responsive"><table style="font-size:12px">
+<thead><tr><th>Employee</th><th>Dept</th><th>Hrs Paid</th><th>Unpaid Hrs</th><th>Basic</th><th>OT</th><th>Allowance</th><th>Gross</th><th>SSS</th><th>PhilHealth</th><th>Pag-IBIG</th><th>W.Tax</th><th>Loans</th><th>Total Ded</th><th>Net Pay</th><th></th></tr></thead>
+<tbody>
+{% for r in records %}
+<tr>
+  <td><div class="fw-600">{{ r.last_name }}, {{ r.first_name }}</div><div class="text-sm text-muted">{{ r.employee_no }}</div></td>
+  <td class="text-muted">{{ r.dept_name or '—' }}</td>
+  <td class="font-mono">{{ "{:,.2f}".format(r.hours_paid or 0) }}</td>
+  <td class="font-mono {{ 'text-danger' if (r.unpaid_hours or 0) > 0 else '' }}">{{ "{:,.2f}".format(r.unpaid_hours or 0) if (r.unpaid_hours or 0) > 0 else '—' }}</td>
+  <td class="font-mono">{{ "{:,.2f}".format(r.basic_salary or 0) }}</td>
+  <td class="font-mono">{{ "{:,.2f}".format(r.ot_amount or 0) if r.ot_amount else '—' }}</td>
+  <td class="font-mono">{{ "{:,.2f}".format(r.allowance_amount or 0) if r.allowance_amount else '—' }}</td>
+  <td class="font-mono fw-600">{{ "{:,.2f}".format(r.gross_salary or 0) }}</td>
+  <td class="font-mono text-danger">{{ "{:,.2f}".format(r.sss_employee or 0) }}</td>
+  <td class="font-mono text-danger">{{ "{:,.2f}".format(r.philhealth_employee or 0) }}</td>
+  <td class="font-mono text-danger">{{ "{:,.2f}".format(r.pagibig_employee or 0) }}</td>
+  <td class="font-mono text-danger">{{ "{:,.2f}".format(r.withholding_tax or 0) if r.withholding_tax else '—' }}</td>
+  <td class="font-mono text-danger">{{ "{:,.2f}".format(r.sss_loan or 0) if r.sss_loan else '—' }}</td>
+  <td class="font-mono fw-600 text-danger">{{ "{:,.2f}".format(r.total_deductions or 0) }}</td>
+  <td class="font-mono fw-600 text-primary">{{ "{:,.2f}".format(r.net_pay or 0) }}</td>
+  <td><a href="{{ url_for('payroll.payslip', payroll_id=r.id) }}" class="btn btn-xs" target="_blank"><i class="ti ti-file-text"></i></a></td>
+</tr>
+{% endfor %}
+</tbody>
+<tfoot>
+<tr style="background:#f9fafb;font-weight:600">
+  <td colspan="7">GRAND TOTAL</td>
+  <td class="font-mono">{{ "{:,.2f}".format(totals.gross or 0) }}</td>
+  <td colspan="5"></td>
+  <td class="font-mono text-danger">{{ "{:,.2f}".format(totals.deductions or 0) }}</td>
+  <td class="font-mono text-primary">{{ "{:,.2f}".format(totals.net or 0) }}</td>
+  <td></td>
+</tr>
+</tfoot>
+</table></div></div>
+{% endblock %}

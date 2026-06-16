@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Timekeeping{% endblock %}
+{% block page_title %}Biometric Timekeeping{% endblock %}
+{% block breadcrumb %}Daily Attendance — {{ period_date }}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('timekeeping.adjustment_log') }}" class="btn"><i class="ti ti-history"></i> Audit Log</a>
+<a href="{{ url_for('timekeeping.period_view') }}" class="btn"><i class="ti ti-calendar-stats"></i> Period Summary</a>
+{% endblock %}
+{% block content %}
+<div class="grid-2 mb-16">
+<div class="stat-card"><div class="stat-icon blue"><i class="ti ti-users"></i></div><div class="stat-val">{{ summary.total or 0 }}</div><div class="stat-label">Total Active</div></div>
+<div class="stat-card"><div class="stat-icon green"><i class="ti ti-circle-check"></i></div><div class="stat-val">{{ summary.present or 0 }}</div><div class="stat-label">Present Today</div></div>
+<div class="stat-card"><div class="stat-icon amber"><i class="ti ti-clock"></i></div><div class="stat-val">{{ summary.late or 0 }}</div><div class="stat-label">Late Arrivals</div></div>
+<div class="stat-card"><div class="stat-icon red"><i class="ti ti-x"></i></div><div class="stat-val">{{ summary.absent or 0 }}</div><div class="stat-label">Absent</div></div>
+</div>
+<div class="card mb-16">
+<div class="card-header">
+  <div class="card-title">Log Attendance</div>
+  <div>
+    <form method="get" style="display:inline">
+      <input type="date" name="date" value="{{ period_date }}" class="form-control" style="width:160px;display:inline-block" onchange="this.form.submit()">
+    </form>
+  </div>
+</div>
+<div class="card-body">
+<form method="post" action="{{ url_for('timekeeping.log_attendance') }}" class="d-flex gap-8 align-center flex-wrap">
+  <select name="employee_id" class="form-control" style="width:220px" required>
+    <option value="">Select Employee</option>
+    {% for e in employees %}<option value="{{ e.id }}">{{ e.last_name }}, {{ e.first_name }}</option>{% endfor %}
+  </select>
+  <input type="hidden" name="work_date" value="{{ period_date }}">
+  <input type="time" name="time_in" class="form-control" style="width:130px" placeholder="Time In">
+  <input type="time" name="time_out" class="form-control" style="width:130px" placeholder="Time Out">
+  <button class="btn btn-primary" type="submit"><i class="ti ti-check"></i> Save</button>
+</form>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><div class="card-title">Attendance Log — {{ period_date }}</div>
+<button class="btn btn-sm" onclick="exportTable()"><i class="ti ti-download"></i> Export</button>
+</div>
+<div class="table-responsive"><table id="att-table">
+<thead><tr><th>Employee</th><th>Dept</th><th>Time In</th><th>Time Out</th><th>Hours</th><th>OT Hrs</th><th>Late (min)</th><th>Status</th><th>Action</th></tr></thead>
+<tbody>
+{% for e in employees %}
+<tr>
+  <td>
+    <div class="fw-600">{{ e.last_name }}, {{ e.first_name }}</div>
+    <div class="text-sm text-muted font-mono">{{ e.employee_no }}</div>
+  </td>
+  <td class="text-sm text-muted">{{ e.dept_name or '—' }}</td>
+  <td class="font-mono text-sm">{{ e.time_in or '—' }}</td>
+  <td class="font-mono text-sm">{{ e.time_out or '—' }}</td>
+  <td class="font-mono text-sm">{{ "{:.2f}".format(e.total_hours or 0) }}</td>
+  <td class="font-mono text-sm">{{ "{:.2f}".format(e.ot_hours or 0) if e.ot_hours else '—' }}</td>
+  <td>{% if e.late_minutes %}<span class="badge badge-amber">{{ e.late_minutes }} min</span>{% else %}—{% endif %}</td>
+  <td>
+    {% if e.is_absent %}<span class="badge badge-red">Absent</span>
+    {% elif e.time_in and e.time_out %}<span class="badge badge-green">Complete</span>
+    {% elif e.time_in %}<span class="badge badge-amber">In Only</span>
+    {% else %}<span class="badge badge-gray">Not Logged</span>{% endif %}
+  </td>
+  <td>
+    <form method="post" action="{{ url_for('timekeeping.log_attendance') }}" style="display:inline">
+      <input type="hidden" name="employee_id" value="{{ e.id }}">
+      <input type="hidden" name="work_date" value="{{ period_date }}">
+      <input type="hidden" name="is_absent" value="1">
+      <button class="btn btn-xs btn-danger" type="submit" title="Mark Absent"><i class="ti ti-x"></i></button>
+    </form>
+    <a href="{{ url_for('timekeeping.timesheet', emp_id=e.id) }}" class="btn btn-xs" title="View Timesheet"><i class="ti ti-list-details"></i></a>
+  </td>
+</tr>
+{% endfor %}
+</tbody>
+</table></div></div>
+{% endblock %}

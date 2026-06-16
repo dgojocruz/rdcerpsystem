@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}Shift Management{% endblock %}
+{% block page_title %}Shift & Leave Management{% endblock %}
+{% block breadcrumb %}Shifts{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('shifts.calendar') }}" class="btn btn-primary"><i class="ti ti-calendar"></i> Calendar View</a>
+{% endblock %}
+{% block content %}
+<div class="grid-2 mb-20">
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="ti ti-sun"></i> Shift Definitions</div>
+    <button class="btn btn-sm btn-primary" onclick="openModal('addShiftModal')"><i class="ti ti-plus"></i> Add Shift</button>
+  </div>
+  <div class="table-responsive"><table>
+  <thead><tr><th>Shift Name</th><th>Time In</th><th>Time Out</th><th>Break</th><th>Color</th></tr></thead>
+  <tbody>
+  {% for s in shifts %}
+  <tr>
+    <td class="fw-600">{{ s.shift_name }}</td>
+    <td class="font-mono">{{ s.time_in }}</td>
+    <td class="font-mono">{{ s.time_out }}</td>
+    <td class="text-muted">{{ s.break_minutes }} min</td>
+    <td><span style="display:inline-block;width:20px;height:20px;border-radius:4px;background:{{ s.color_hex }}"></span></td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="text-center text-muted" style="padding:16px">No shifts defined.</td></tr>
+  {% endfor %}
+  </tbody></table></div>
+</div>
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="ti ti-clipboard-list"></i> Schedule Templates</div>
+  </div>
+  <div class="table-responsive"><table>
+  <thead><tr><th>Template Name</th><th>Type</th><th>Group</th></tr></thead>
+  <tbody>
+  {% for t in templates %}
+  <tr>
+    <td class="fw-600">{{ t.template_name }}</td>
+    <td><span class="badge badge-blue">{{ t.template_type }}</span></td>
+    <td class="text-muted text-sm">{{ t.applies_to_group or 'All' }}</td>
+  </tr>
+  {% else %}<tr><td colspan="3" class="text-center text-muted" style="padding:16px">No templates yet.</td></tr>
+  {% endfor %}
+  </tbody></table></div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="card-title"><i class="ti ti-calendar-plus"></i> Assign Schedule</div>
+</div>
+<div class="card-body">
+<form method="post" action="{{ url_for('shifts.assign_schedule') }}">
+  <div class="form-row cols-4">
+    <div class="form-group"><label class="form-label">From Date</label><input type="date" name="date_from" class="form-control" required></div>
+    <div class="form-group"><label class="form-label">To Date</label><input type="date" name="date_to" class="form-control" required></div>
+    <div class="form-group"><label class="form-label">Shift</label>
+      <select name="shift_id" class="form-control">
+        <option value="">Rest Day</option>
+        {% for s in shifts %}<option value="{{ s.id }}">{{ s.shift_name }} ({{ s.time_in }}-{{ s.time_out }})</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Rest Day?</label>
+      <select name="is_rest_day" class="form-control"><option value="0">Working Day</option><option value="1">Rest Day</option></select>
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="form-label">Employees (hold Ctrl for multiple)</label>
+    <select name="employee_ids" class="form-control" multiple style="height:120px" required>
+      {% for e in g.db.execute("SELECT id,employee_no,last_name,first_name FROM employees WHERE status='ACTIVE' ORDER BY last_name").fetchall() %}
+      <option value="{{ e.id }}">{{ e.last_name }}, {{ e.first_name }} ({{ e.employee_no }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Assign Schedule</button>
+</form>
+</div></div>
+
+<div class="modal-backdrop" id="addShiftModal">
+<div class="modal-dialog">
+  <div class="modal-header"><div class="modal-title">Add Shift Definition</div>
+    <button class="btn btn-xs" onclick="closeModal('addShiftModal')"><i class="ti ti-x"></i></button>
+  </div>
+  <form method="post" action="{{ url_for('shifts.add_shift') }}">
+  <div class="modal-body">
+    <div class="form-group"><label class="form-label">Shift Name *</label><input name="shift_name" class="form-control" required placeholder="e.g. Morning A"></div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Time In *</label><input type="time" name="time_in" class="form-control" required></div>
+      <div class="form-group"><label class="form-label">Time Out *</label><input type="time" name="time_out" class="form-control" required></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Break (minutes)</label><input name="break_minutes" type="number" class="form-control" value="60"></div>
+      <div class="form-group"><label class="form-label">Color</label><input name="color_hex" type="color" class="form-control" value="#3B82F6" style="height:36px;padding:4px"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Overnight shift?</label>
+      <select name="is_overnight" class="form-control"><option value="0">No</option><option value="1">Yes (crosses midnight)</option></select>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn" onclick="closeModal('addShiftModal')">Cancel</button>
+    <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Save Shift</button>
+  </div>
+  </form>
+</div></div>
+{% endblock %}

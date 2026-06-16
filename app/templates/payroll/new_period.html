@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}New Pay Period{% endblock %}
+{% block page_title %}New Pay Period{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('payroll.index') }}">Payroll</a> / New Period{% endblock %}
+{% block content %}
+<div class="card" style="max-width:600px">
+<div class="card-header"><div class="card-title">Create Pay Period</div></div>
+<div class="card-body">
+<form method="post">
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Period Type</label>
+      <select name="period_type" class="form-control">
+        <option value="SEMI_MONTHLY_1ST">Semi-Monthly (1st)</option>
+        <option value="SEMI_MONTHLY_2ND">Semi-Monthly (2nd)</option>
+        <option value="WEEKLY">Weekly</option>
+        <option value="MONTHLY">Monthly</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Payroll Group</label>
+      <select name="payroll_group" class="form-control">
+        <option value="ALL">All Employees</option>
+        <option value="MONTHLY">Monthly Only</option>
+        <option value="WEEKLY">Weekly Only</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-group"><label class="form-label">Period Label</label><input name="period_label" class="form-control" placeholder="e.g. Jan 1-15, 2026 (Semi 1st)" required></div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Date From</label><input type="date" name="date_from" class="form-control" required></div>
+    <div class="form-group"><label class="form-label">Date To</label><input type="date" name="date_to" class="form-control" required></div>
+  </div>
+  <div class="d-flex gap-8 justify-between">
+    <a href="{{ url_for('payroll.index') }}" class="btn">Cancel</a>
+    <button type="submit" class="btn btn-primary"><i class="ti ti-arrow-right"></i> Create & Compute</button>
+  </div>
+</form>
+</div></div>
+{% endblock %}

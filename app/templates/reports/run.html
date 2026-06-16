@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}{{ report.report_name }}{% endblock %}
+{% block page_title %}{{ report.report_name }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('reports.index') }}">Reports</a> / Run{% endblock %}
+{% block extra_css %}
+<style>
+.filter-bar{background:#f9fafb;border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px}
+.result-count{font-size:12px;color:var(--text-muted);padding:8px 0}
+.currency-col{text-align:right;font-family:monospace}
+.chart-wrap{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+</style>
+{% endblock %}
+{% block topbar_actions %}
+<form method="post" action="{{ url_for('reports.export_report', report_id=report.id) }}" style="display:inline">
+  {% for fd in filters_def %}<input type="hidden" name="{{ fd.field }}" value="{{ filter_values.get(fd.field,'') }}">{% endfor %}
+  <button type="submit" class="btn"><i class="ti ti-file-spreadsheet"></i> Export Excel</button>
+</form>
+<a href="{{ url_for('reports.index') }}" class="btn"><i class="ti ti-arrow-left"></i> Back</a>
+{% endblock %}
+{% block content %}
+<div class="filter-bar">
+<form method="post" class="d-flex gap-8 align-center flex-wrap">
+  {% for fd in filters_def %}
+  <div class="form-group mb-0">
+    <label class="form-label">{{ fd.label }}</label>
+    {% if fd.type == 'select' %}
+    <select name="{{ fd.field }}" class="form-control" style="width:150px">
+      <option value="">All</option>
+      {% for opt in fd.get('options',[]) %}<option {% if filter_values.get(fd.field)==opt %}selected{% endif %}>{{ opt }}</option>{% endfor %}
+    </select>
+    {% elif fd.type == 'date' %}
+    <input type="date" name="{{ fd.field }}" class="form-control" value="{{ filter_values.get(fd.field,'') }}">
+    {% else %}
+    <input type="text" name="{{ fd.field }}" class="form-control" style="width:160px" value="{{ filter_values.get(fd.field,'') }}" placeholder="{{ fd.label }}">
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div {% if filters_def %}style="margin-top:20px"{% endif %}>
+    <button type="submit" class="btn btn-primary"><i class="ti ti-player-play"></i> Run Report</button>
+  </div>
+</form>
+</div>
+
+{% if rows is defined and rows %}
+{% if chart_type and chart_type != 'none' %}
+<div class="chart-wrap">
+  <canvas id="reportChart" style="max-height:280px"></canvas>
+</div>
+{% endif %}
+
+<div class="card">
+<div class="card-header">
+  <div class="card-title">Results</div>
+  <div class="text-sm text-muted">{{ rows|length }} record{{ 's' if rows|length != 1 else '' }}</div>
+</div>
+<div class="table-responsive"><table>
+<thead><tr>
+  {% for col in columns %}<th {% if col.get('format')=='currency' %}style="text-align:right"{% endif %}>{{ col.label }}</th>{% endfor %}
+</tr></thead>
+<tbody>
+{% for row in rows %}
+<tr>
+  {% for col in columns %}
+  {% set val = row[col.field] if col.field in row.keys() else '—' %}
+  <td {% if col.get('format')=='currency' %}class="currency-col"{% endif %}>
+    {% if col.get('format') == 'currency' and val is not none and val != '—' %}
+      ₱{{ "{:,.2f}".format(val|float) }}
+    {% elif col.get('format') == 'number' and val is not none and val != '—' %}
+      {{ "{:,.2f}".format(val|float) if val else '—' }}
+    {% else %}
+      {{ val if val is not none else '—' }}
+    {% endif %}
+  </td>
+  {% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table></div></div>
+{% elif request.method == 'POST' %}
+<div class="card"><div class="card-body text-center" style="padding:32px;color:#6b7280">
+  <i class="ti ti-search-off" style="font-size:36px;display:block;margin-bottom:8px"></i>
+  No results found for the selected filters.
+</div></div>
+{% else %}
+<div class="card"><div class="card-body text-center" style="padding:32px;color:#6b7280">
+  <i class="ti ti-player-play" style="font-size:36px;display:block;margin-bottom:8px"></i>
+  <div class="fw-600 mb-4">{{ report.report_name }}</div>
+  <div class="text-sm">{{ report.description or 'Set filters above and click Run Report' }}</div>
+</div></div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+{% if rows and chart_type and chart_type != 'none' %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  const rows = {{ rows | tojson if rows else '[]' }};
+  const cols = {{ columns | tojson }};
+  const labelCol = cols[0]?.field;
+  const valueCol = cols.find(c => c.format === 'currency' || c.format === 'number')?.field || cols[1]?.field;
+  if (!rows.length || !labelCol || !valueCol) return;
+  const labels = rows.map(r => String(r[labelCol] || ''));
+  const values = rows.map(r => parseFloat(r[valueCol]) || 0);
+  new Chart(document.getElementById('reportChart'), {
+    type: '{{ chart_type }}',
+    data: {labels, datasets:[{data:values, label: cols.find(c=>c.field===valueCol)?.label || '',
+      backgroundColor: labels.map((_,i)=>['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#F97316'][i%6]+'CC'),
+      borderRadius:4, tension:0.3}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

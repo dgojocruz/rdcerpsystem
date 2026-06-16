@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block breadcrumb %}Overview{% endblock %}
+{% block extra_css %}
+<style>
+/* ── Widget Grid ── */
+.widget-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.widget-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:160px;position:relative;overflow:hidden}
+.widget-card.col-2{grid-column:span 2}
+.widget-card.col-4{grid-column:span 4}
+.widget-card.row-2{min-height:300px}
+.widget-header{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:#fafafa;flex-shrink:0}
+.widget-title{font-size:12px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px}
+.widget-remove{opacity:0;transition:opacity .15s;background:none;border:none;cursor:pointer;color:#ef4444;padding:2px 5px;border-radius:4px;font-size:12px}
+.widget-card:hover .widget-remove{opacity:1}
+.widget-body{padding:14px;flex:1;overflow:auto}
+
+/* ── Stat widgets ── */
+.stat-widget{height:100%;display:flex;flex-direction:column;justify-content:center;padding:4px 0}
+.stat-icon-wrap{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:10px}
+.ic-blue{background:#eff6ff;color:#1d4ed8}.ic-green{background:#f0fdf4;color:#15803d}
+.ic-amber{background:#fffbeb;color:#b45309}.ic-red{background:#fef2f2;color:#dc2626}
+.ic-purple{background:#faf5ff;color:#7c3aed}.ic-gray{background:#f3f4f6;color:#6b7280}
+.stat-val{font-size:26px;font-weight:700;line-height:1;color:var(--text)}
+.stat-sub{font-size:11px;color:var(--text-muted);margin-top:5px}
+
+/* ── Table in widget ── */
+.mini-table{width:100%;border-collapse:collapse;font-size:11px}
+.mini-table th{text-align:left;padding:5px 8px;background:#f9fafb;border-bottom:1px solid var(--border);font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.mini-table td{padding:7px 8px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+.mini-table tr:last-child td{border-bottom:none}
+
+/* ── List in widget ── */
+.mini-list-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f3f4f6;font-size:11px}
+.mini-list-item:last-child{border-bottom:none}
+
+/* ── Edit mode ── */
+.edit-bar{background:#1e2a3b;color:#fff;padding:10px 20px;display:none;align-items:center;gap:12px;font-size:12px;border-bottom:2px solid #3b82f6;position:sticky;top:54px;z-index:35;margin:-20px -20px 16px}
+.edit-bar.active{display:flex}
+.widget-grid.edit-mode .widget-card{border:2px dashed #3b82f6;cursor:grab}
+.widget-grid.edit-mode .widget-header{background:#eff6ff}
+.widget-grid.edit-mode .widget-remove{opacity:1}
+
+/* ── Widget picker ── */
+.wpicker{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.wpick-btn{border:1px solid var(--border);border-radius:8px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .12s;background:#fff;width:100%}
+.wpick-btn:hover{border-color:var(--primary);background:#eff6ff}
+.wpick-btn .ti{font-size:22px;display:block;margin-bottom:5px;color:var(--primary)}
+.wpick-btn span{font-size:10px;font-weight:500;color:var(--text)}
+
+.empty-dash{text-align:center;padding:80px 20px;color:#9ca3af;grid-column:1/-1}
+.empty-dash .ti{font-size:56px;display:block;margin-bottom:12px;opacity:.25}
+</style>
+{% endblock %}
+{% block topbar_actions %}
+<button class="btn btn-sm" id="editModeBtn" onclick="toggleEdit()">
+  <i class="ti ti-layout-grid-add"></i> Customize
+</button>
+{% endblock %}
+{% block content %}
+
+<!-- Edit bar -->
+<div class="edit-bar" id="editBar">
+  <i class="ti ti-drag-drop" style="font-size:16px;color:#93c5fd"></i>
+  <span style="font-weight:600">Edit Mode</span>
+  <button class="btn btn-sm btn-primary" onclick="openModal('addWidgetModal')">
+    <i class="ti ti-plus"></i> Add Widget
+  </button>
+  <button class="btn btn-sm" onclick="toggleEdit()" style="margin-left:auto;color:#f87171;border-color:#f87171">
+    <i class="ti ti-x"></i> Done
+  </button>
+</div>
+
+<!-- Widget Grid -->
+<div class="widget-grid" id="widgetGrid">
+
+{% if not widgets %}
+<div class="empty-dash">
+  <i class="ti ti-layout-grid-add"></i>
+  <div class="fw-600 mb-8" style="font-size:15px">Your dashboard is empty</div>
+  <div class="text-sm mb-16">Click <strong>Customize</strong> to add widgets</div>
+  <button class="btn btn-primary" onclick="toggleEdit();openModal('addWidgetModal')">
+    <i class="ti ti-plus"></i> Add Your First Widget
+  </button>
+</div>
+{% endif %}
+
+{% for w in widgets %}
+{% set data = widget_data.get(w.id, {}) %}
+{% set meta = widget_registry.get(w.widget_type, {}) %}
+{% set color = meta.get('color','gray') %}
+{% set icon  = meta.get('icon','ti-puzzle') %}
+{% set size  = meta.get('size','1x1') %}
+
+<div class="widget-card {% if size == '2x2' or size == '2x1' %}col-2{% endif %} {% if size == '2x2' %}row-2{% endif %}"
+     id="wcard_{{ w.id }}">
+  <div class="widget-header">
+    <div class="widget-title">
+      <i class="ti {{ icon }}" style="color:var(--primary)"></i>
+      {{ w.widget_title or meta.get('label', w.widget_type) }}
+    </div>
+    <form method="post" action="{{ url_for('dashboard.remove_widget', wid=w.id) }}" style="display:inline"
+          onsubmit="return confirm('Remove this widget?')">
+      <button type="submit" class="widget-remove" title="Remove widget">
+        <i class="ti ti-x"></i>
+      </button>
+    </form>
+  </div>
+  <div class="widget-body">
+
+    {# ── STAT WIDGETS ── #}
+    {% if w.widget_type.startswith('stat_') %}
+    <div class="stat-widget">
+      <div class="stat-icon-wrap ic-{{ color }}">
+        <i class="ti {{ icon }}"></i>
+      </div>
+      <div class="stat-val">{{ data.get('value', '—') }}</div>
+      <div class="stat-sub">{{ data.get('sub', '') }}</div>
+    </div>
+
+    {# ── CHART WIDGETS ── #}
+    {% elif w.widget_type.startswith('chart_') %}
+    <canvas id="canvas_{{ w.id }}" style="width:100%;max-height:220px"></canvas>
+
+    {# ── RECENT PAYROLL TABLE ── #}
+    {% elif w.widget_type == 'table_recent_payroll' %}
+    {% if data.get('rows') %}
+    <table class="mini-table">
+      <thead><tr><th>Period</th><th>Emps</th><th>Net Pay</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for r in data['rows'] %}
+      <tr>
+        <td>{{ r.get('period_label','—') }}</td>
+        <td class="text-center">{{ r.get('cnt',0) or '—' }}</td>
+        <td class="font-mono">{% if r.get('net') %}₱{{ "{:,.0f}".format(r['net']) }}{% else %}—{% endif %}</td>
+        <td><span class="badge badge-{{ 'green' if r.get('status')=='RELEASED' else 'blue' if r.get('status')=='APPROVED' else 'amber' if r.get('status')=='COMPUTED' else 'gray' }}">{{ r.get('status','—') }}</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted text-sm text-center" style="padding:20px">No payroll runs yet. <a href="{{ url_for('payroll.new_period') }}">Create one →</a></p>
+    {% endif %}
+
+    {# ── HOLIDAYS LIST ── #}
+    {% elif w.widget_type == 'list_holidays' %}
+    {% if data.get('rows') %}
+    {% for r in data['rows'] %}
+    <div class="mini-list-item">
+      <span class="fw-600" style="font-size:11px">{{ r.get('holiday_name','') }}</span>
+      <div class="d-flex gap-8 align-center">
+        <span class="font-mono text-muted" style="font-size:10px">{{ r.get('holiday_date','') }}</span>
+        <span class="badge badge-{{ 'red' if r.get('holiday_type')=='LEGAL' else 'amber' }}">{{ r.get('holiday_type','') }}</span>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="text-muted text-sm text-center" style="padding:20px">No upcoming holidays</p>
+    {% endif %}
+
+    {# ── PENDING LEAVES ── #}
+    {% elif w.widget_type == 'list_pending_leaves' %}
+    {% if data.get('rows') %}
+    {% for r in data['rows'] %}
+    <div class="mini-list-item">
+      <span class="fw-600">{{ r.get('last_name','') }}, {{ r.get('first_name','') }}</span>
+      <div class="d-flex gap-8 align-center">
+        <span class="badge badge-blue">{{ r.get('leave_type','') }}</span>
+        <span class="text-muted" style="font-size:10px">{{ r.get('date_from','') }} · {{ r.get('num_days',0) }}d</span>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="text-muted text-sm text-center" style="padding:20px">No pending leave requests</p>
+    {% endif %}
+
+    {# ── RECENT HIRES ── #}
+    {% elif w.widget_type == 'list_recent_hires' %}
+    {% if data.get('rows') %}
+    {% for r in data['rows'] %}
+    <div class="mini-list-item">
+      <div>
+        <div class="fw-600" style="font-size:11px">{{ r.get('last_name','') }}, {{ r.get('first_name','') }}</div>
+        <div class="text-muted" style="font-size:10px">{{ r.get('position_title','') }}</div>
+      </div>
+      <span class="font-mono text-muted" style="font-size:10px">{{ r.get('date_hired','') }}</span>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="text-muted text-sm text-center" style="padding:20px">No recent hires</p>
+    {% endif %}
+
+    {# ── FALLBACK ── #}
+    {% else %}
+    <p class="text-muted text-sm">Widget type: {{ w.widget_type }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+</div><!-- /widget-grid -->
+
+<!-- Add Widget Modal -->
+<div class="modal-backdrop" id="addWidgetModal">
+<div class="modal-dialog" style="width:580px">
+  <div class="modal-header">
+    <div class="modal-title"><i class="ti ti-layout-grid-add"></i> Add Widget</div>
+    <button class="btn btn-xs" onclick="closeModal('addWidgetModal')"><i class="ti ti-x"></i></button>
+  </div>
+  <div class="modal-body">
+    <p class="text-muted text-sm mb-16">Choose a widget to add to your dashboard:</p>
+    <div class="wpicker">
+    {% for wtype, meta in widget_registry.items() %}
+    <form method="post" action="{{ url_for('dashboard.add_widget') }}">
+      <input type="hidden" name="widget_type" value="{{ wtype }}">
+      <button type="submit" class="wpick-btn">
+        <i class="ti {{ meta.icon }}"></i>
+        <span>{{ meta.label }}</span>
+      </button>
+    </form>
+    {% endfor %}
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('addWidgetModal')">Cancel</button>
+  </div>
+</div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+/* ── Chart rendering ── */
+const chartData = {
+  {% for w in widgets %}
+  {% if w.widget_type.startswith('chart_') %}
+  {{ w.id }}: {
+    labels: {{ widget_data.get(w.id, {}).get('labels', []) | tojson }},
+    values: {{ widget_data.get(w.id, {}).get('values', []) | tojson }},
+    type:   "{{ 'line' if 'trend' in w.widget_type else 'bar' }}"
+  },
+  {% endif %}
+  {% endfor %}
+};
+const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#F97316','#84CC16','#EC4899','#14B8A6'];
+Object.entries(chartData).forEach(([wid, d]) => {
+  const canvas = document.getElementById('canvas_' + wid);
+  if (!canvas || !d.labels.length) return;
+  new Chart(canvas, {
+    type: d.type,
+    data: {
+      labels: d.labels,
+      datasets: [{
+        data: d.values,
+        backgroundColor: d.type === 'line' ? '#3B82F620' : d.labels.map((_,i) => COLORS[i % COLORS.length] + 'CC'),
+        borderColor: d.type === 'line' ? '#3B82F6' : d.labels.map((_,i) => COLORS[i % COLORS.length]),
+        borderWidth: d.type === 'line' ? 2 : 1,
+        borderRadius: 4, tension: 0.3, fill: d.type === 'line',
+        pointBackgroundColor: '#3B82F6'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+        x: { ticks: { font: { size: 10 }, maxRotation: 30 } }
+      }
+    }
+  });
+});
+
+/* ── Edit mode ── */
+function toggleEdit() {
+  const bar  = document.getElementById('editBar');
+  const grid = document.getElementById('widgetGrid');
+  const btn  = document.getElementById('editModeBtn');
+  const on   = !bar.classList.contains('active');
+  bar.classList.toggle('active', on);
+  grid.classList.toggle('edit-mode', on);
+  btn.innerHTML = on
+    ? '<i class="ti ti-x"></i> Exit Customize'
+    : '<i class="ti ti-layout-grid-add"></i> Customize';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}System Settings{% endblock %}
+{% block breadcrumb %}Configuration{% endblock %}
+{% block content %}
+<div class="tabs mb-0" id="settings-tabs">
+  <a href="#" class="tab-item active" onclick="showTab('company',this)">Company</a>
+  <a href="#" class="tab-item" onclick="showTab('modules',this)">Modules</a>
+  <a href="#" class="tab-item" onclick="showTab('departments',this)">Departments</a>
+  <a href="#" class="tab-item" onclick="showTab('holidays',this)">Holidays</a>
+  <a href="#" class="tab-item" onclick="showTab('users',this)">Users</a>
+</div>
+
+<div id="tab-company" class="card">
+<div class="card-header"><div class="card-title">Company Information</div></div>
+<div class="card-body">
+<form method="post" action="{{ url_for('settings.update_company') }}">
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Company Name *</label><input name="company_name" class="form-control" required value="{{ company.company_name if company else '' }}"></div>
+    <div class="form-group"><label class="form-label">Trade Name / Short Name</label><input name="trade_name" class="form-control" value="{{ company.trade_name if company else '' }}"></div>
+  </div>
+  <div class="form-row cols-3">
+    <div class="form-group"><label class="form-label">Address</label><input name="address" class="form-control" value="{{ company.address if company else '' }}"></div>
+    <div class="form-group"><label class="form-label">City</label><input name="city" class="form-control" value="{{ company.city if company else '' }}"></div>
+    <div class="form-group"><label class="form-label">Province</label><input name="province" class="form-control" value="{{ company.province if company else '' }}"></div>
+  </div>
+  <div class="form-row cols-3">
+    <div class="form-group"><label class="form-label">Phone</label><input name="phone" class="form-control" value="{{ company.phone if company else '' }}"></div>
+    <div class="form-group"><label class="form-label">Email</label><input name="email" class="form-control" value="{{ company.email if company else '' }}"></div>
+    <div class="form-group"><label class="form-label">TIN</label><input name="tin" class="form-control" value="{{ company.tin if company else '' }}"></div>
+  </div>
+  <div class="form-row cols-3">
+    <div class="form-group"><label class="form-label">SSS Employer No.</label><input name="sss_employer_no" class="form-control" value="{{ company.sss_employer_no if company else '' }}"></div>
+    <div class="form-group"><label class="form-label">PhilHealth Employer Code</label><input name="philhealth_employer_no" class="form-control" value="{{ company.philhealth_employer_no if company else '' }}"></div>
+    <div class="form-group"><label class="form-label">Pag-IBIG Employer No.</label><input name="pagibig_employer_no" class="form-control" value="{{ company.pagibig_employer_no if company else '' }}"></div>
+  </div>
+  <div class="form-row cols-2">
+    <div class="form-group"><label class="form-label">Work Hours / Day</label><input name="work_hours_per_day" type="number" class="form-control" value="{{ company.work_hours_per_day if company else 8 }}"></div>
+    <div class="form-group"><label class="form-label">Work Days / Week</label><input name="work_days_per_week" type="number" class="form-control" value="{{ company.work_days_per_week if company else 6 }}"></div>
+  </div>
+  <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Save Company Info</button>
+</form>
+</div></div>
+
+<div id="tab-modules" class="card" style="display:none">
+<div class="card-header"><div class="card-title">ERP Modules</div></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Module</th><th>Status</th><th>Action</th></tr></thead>
+<tbody>
+{% for m in modules %}
+<tr>
+  <td><div class="d-flex align-center gap-8"><i class="ti {{ m.icon }}" style="font-size:18px"></i><div class="fw-600">{{ m.module_name }}</div></div></td>
+  <td><span class="badge badge-{{ 'green' if m.is_enabled else 'gray' }}">{{ 'Enabled' if m.is_enabled else 'Disabled' }}</span></td>
+  <td>
+    <form method="post" action="{{ url_for('settings.toggle_module') }}" style="display:inline">
+      <input type="hidden" name="module_key" value="{{ m.module_key }}">
+      <button class="btn btn-sm" type="submit">{{ 'Disable' if m.is_enabled else 'Enable' }}</button>
+    </form>
+  </td>
+</tr>{% endfor %}
+</tbody></table></div></div>
+
+<div id="tab-departments" class="card" style="display:none">
+<div class="card-header"><div class="card-title">Departments</div></div>
+<div class="card-body">
+<form method="post" action="{{ url_for('settings.add_department') }}" class="d-flex gap-8 mb-16">
+  <input name="code" class="form-control" style="width:100px" placeholder="Code" required>
+  <input name="name" class="form-control" placeholder="Department Name" required>
+  <select name="dept_type" class="form-control" style="width:140px"><option value="ADM">ADM</option><option value="IND">IND</option><option value="DL">DL</option></select>
+  <button class="btn btn-primary" type="submit"><i class="ti ti-plus"></i> Add</button>
+</form>
+<table>
+<thead><tr><th>Code</th><th>Department</th><th>Type</th><th>Employees</th></tr></thead>
+<tbody>
+{% for d in departments %}
+<tr>
+  <td class="font-mono">{{ d.code }}</td>
+  <td>{{ d.name }}</td>
+  <td><span class="badge badge-gray">{{ d.dept_type }}</span></td>
+  <td>{{ d.emp_count }}</td>
+</tr>{% endfor %}
+</tbody></table>
+</div></div>
+
+<div id="tab-holidays" class="card" style="display:none">
+<div class="card-header"><div class="card-title">Philippine Holidays</div></div>
+<div class="card-body">
+<form method="post" action="{{ url_for('settings.add_holiday') }}" class="d-flex gap-8 mb-16">
+  <input type="date" name="holiday_date" class="form-control" style="width:160px" required>
+  <input name="holiday_name" class="form-control" placeholder="Holiday Name" required>
+  <select name="holiday_type" class="form-control" style="width:140px"><option value="LEGAL">Legal Holiday</option><option value="SPECIAL">Special Holiday</option></select>
+  <button class="btn btn-primary" type="submit"><i class="ti ti-plus"></i> Add</button>
+</form>
+<table>
+<thead><tr><th>Date</th><th>Holiday</th><th>Type</th></tr></thead>
+<tbody>
+{% for h in holidays %}<tr>
+  <td class="font-mono text-sm">{{ h.holiday_date }}</td>
+  <td>{{ h.holiday_name }}</td>
+  <td><span class="badge badge-{{ 'red' if h.holiday_type=='LEGAL' else 'amber' }}">{{ h.holiday_type }}</span></td>
+</tr>{% endfor %}
+</tbody></table>
+</div></div>
+
+<div id="tab-users" class="card" style="display:none">
+<div class="card-header"><div class="card-title">System Users</div></div>
+<div class="card-body">
+<form method="post" action="{{ url_for('settings.add_user') }}" class="d-flex gap-8 mb-16 flex-wrap">
+  <input name="username" class="form-control" style="width:130px" placeholder="Username" required>
+  <input name="full_name" class="form-control" style="width:180px" placeholder="Full Name">
+  <input type="password" name="password" class="form-control" style="width:140px" placeholder="Password" required>
+  <select name="role" class="form-control" style="width:120px"><option value="admin">Admin</option><option value="hr">HR</option><option value="staff">Staff</option><option value="viewer">Viewer</option></select>
+  <button class="btn btn-primary" type="submit"><i class="ti ti-plus"></i> Add User</button>
+</form>
+<table>
+<thead><tr><th>Username</th><th>Full Name</th><th>Role</th><th>Status</th><th>Last Login</th></tr></thead>
+<tbody>
+{% for u in users %}<tr>
+  <td class="font-mono">{{ u.username }}</td>
+  <td>{{ u.full_name or '—' }}</td>
+  <td><span class="badge badge-{{ 'blue' if u.role=='admin' else 'gray' }}">{{ u.role }}</span></td>
+  <td><span class="badge badge-{{ 'green' if u.is_active else 'red' }}">{{ 'Active' if u.is_active else 'Inactive' }}</span></td>
+  <td class="text-sm text-muted">{{ u.last_login or 'Never' }}</td>
+</tr>{% endfor %}
+</tbody></table>
+</div></div>
+
+
+<div id="tab-customfields" class="card" style="display:none" data-tabgroup="settings-tabs">
+<div class="card-header"><div class="card-title">Custom Fields</div></div>
+<div class="card-body">
+<form method="post" action="{{ url_for('settings.add_custom_field') }}" class="d-flex gap-8 mb-16 flex-wrap">
+  <input name="field_key" class="form-control" style="width:130px" placeholder="field_key" required>
+  <input name="field_label" class="form-control" style="width:160px" placeholder="Display Label" required>
+  <select name="field_type" class="form-control" style="width:120px">
+    <option value="TEXT">Text</option><option value="NUMBER">Number</option>
+    <option value="DATE">Date</option><option value="SELECT">Select</option>
+  </select>
+  <input name="field_options" class="form-control" style="width:180px" placeholder="Options (comma-sep for SELECT)">
+  <button class="btn btn-primary" type="submit"><i class="ti ti-plus"></i> Add</button>
+</form>
+<table>
+<thead><tr><th>Key</th><th>Label</th><th>Type</th><th>Options</th></tr></thead>
+<tbody>
+{% for f in custom_fields %}<tr>
+  <td class="font-mono text-sm">{{ f.field_key }}</td>
+  <td>{{ f.field_label }}</td>
+  <td><span class="badge badge-blue">{{ f.field_type }}</span></td>
+  <td class="text-sm text-muted">{{ f.field_options or '—' }}</td>
+</tr>{% endfor %}
+</tbody></table>
+</div></div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+function showTab(id,el){
+  ['company','modules','departments','holidays','users'].forEach(t=>document.getElementById('tab-'+t).style.display='none');
+  document.getElementById('tab-'+id).style.display='';
+  document.querySelectorAll('#settings-tabs .tab-item').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  return false;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}Import Employees{% endblock %}
+{% block page_title %}Batch Employee Import{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('employees.index') }}">Employees</a> / Import{% endblock %}
+{% block content %}
+<div class="grid-2">
+<div class="card">
+<div class="card-header"><div class="card-title"><i class="ti ti-file-spreadsheet"></i> Import from Excel / CSV</div></div>
+<div class="card-body">
+  <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:var(--radius);padding:12px;margin-bottom:16px;font-size:12px">
+    <div class="fw-600 mb-4"><i class="ti ti-info-circle"></i> Supported formats</div>
+    <ul style="margin-left:16px;line-height:1.8">
+      <li>Your <strong>PAyroll.xlsx</strong> — columns auto-detected</li>
+      <li>Standard template (download below)</li>
+      <li>Any Excel with: Last Name, First Name, Daily Rate, Payroll Group</li>
+    </ul>
+  </div>
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="action" value="preview">
+    <div class="form-group">
+      <label class="form-label">Select Excel File (.xlsx)</label>
+      <input type="file" name="file" accept=".xlsx,.xls,.csv" class="form-control" required>
+    </div>
+    <div class="d-flex justify-between align-center">
+      <a href="{{ url_for('employees.download_template') }}" class="btn btn-sm">
+        <i class="ti ti-download"></i> Download Template
+      </a>
+      <button type="submit" class="btn btn-primary">
+        <i class="ti ti-eye"></i> Preview Import
+      </button>
+    </div>
+  </form>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><div class="card-title"><i class="ti ti-info-circle"></i> Column Mapping Guide</div></div>
+<div class="card-body">
+<table>
+<thead><tr><th>Excel Column</th><th>Maps To</th><th>Required</th></tr></thead>
+<tbody>
+{% for row in [
+  ('Employee Last Name', 'last_name', '✓'),
+  ('Employee First Name', 'first_name', '✓'),
+  ('Employee Middle Name', 'middle_name', ''),
+  ('Payroll Group', 'MONTHLY / WEEKLY', '✓'),
+  ('TAX IDENTIFICATION NO.', 'tin', ''),
+  ('Department/Position', 'position_title + dept guess', ''),
+  ('Dept. Type', 'IND / DL / ADM', ''),
+  ('Tax Type', 'AWE / MWE', ''),
+  ('Payment Method', 'ATM / CASH', ''),
+  ('Daily Rate', 'daily_rate', '✓'),
+  ('SSS No', 'sss_no', ''),
+  ('PhilHealth No', 'philhealth_no', ''),
+] %}
+<tr>
+  <td class="font-mono text-sm">{{ row[0] }}</td>
+  <td class="text-sm">{{ row[1] }}</td>
+  <td class="text-center">{{ row[2] }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+<div style="margin-top:12px;font-size:11px;color:var(--text-muted)">
+  Duplicate employees (same Last + First Name) are automatically skipped.
+  Import can be run multiple times safely.
+</div>
+</div>
+</div>
+</div>
+{% endblock %}

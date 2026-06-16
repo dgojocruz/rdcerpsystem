@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}{{ emp.last_name }}, {{ emp.first_name }}{% endblock %}
+{% block page_title %}{{ emp.last_name }}, {{ emp.first_name }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('employees.index') }}">Employees</a> / {{ emp.employee_no }}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('employees.edit', emp_id=emp.id) }}" class="btn"><i class="ti ti-edit"></i> Edit</a>
+<a href="{{ url_for('payroll.backpay', emp_id=emp.id) }}" class="btn btn-danger"><i class="ti ti-file-text"></i> Backpay</a>
+{% endblock %}
+{% block content %}
+<div class="grid-2">
+<div class="card">
+  <div class="card-body">
+    <div class="d-flex align-center gap-8 mb-16">
+      <div class="emp-avatar" style="width:56px;height:56px;font-size:18px;background:#eff6ff;color:#1d4ed8">{{ emp.last_name[0] }}{{ emp.first_name[0] }}</div>
+      <div>
+        <div style="font-size:18px;font-weight:700">{{ emp.last_name }}, {{ emp.first_name }} {% if emp.middle_name %}{{ emp.middle_name }}{% endif %}</div>
+        <div class="text-muted">{{ emp.position_title or '—' }} · {{ emp.dept_name or '—' }}</div>
+        <div class="d-flex gap-8 mt-8">
+          <span class="badge badge-{{ 'green' if emp.status=='ACTIVE' else 'red' }}">{{ emp.status }}</span>
+          <span class="badge badge-blue">{{ emp.payroll_group }}</span>
+          <span class="badge badge-gray">{{ emp.tax_type }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="section-divider">Employment Information</div>
+    {% for row in [
+      ('Employee No.', emp.employee_no),
+      ('Department', emp.dept_name or '—'),
+      ('Position', emp.position_title or '—'),
+      ('Dept. Type', emp.dept_type),
+      ('Employment Type', emp.employment_type),
+      ('Date Hired', emp.date_hired or '—'),
+      ('Payment Method', emp.payment_method),
+    ] %}
+    <div class="d-flex justify-between" style="padding:7px 0;border-bottom:1px solid #f3f4f6">
+      <span class="text-sm text-muted">{{ row[0] }}</span>
+      <span class="text-sm fw-600">{{ row[1] }}</span>
+    </div>
+    {% endfor %}
+    <div class="section-divider mt-16">Salary Details</div>
+    {% for row in [
+      ('Daily Rate', '₱' + "{:,.2f}".format(emp.daily_rate or 0)),
+      ('Hourly Rate', '₱' + "{:,.2f}".format(emp.hourly_rate or 0)),
+      ('Allowance', '₱' + "{:,.2f}".format(emp.allowance_amount or 0)),
+    ] %}
+    <div class="d-flex justify-between" style="padding:7px 0;border-bottom:1px solid #f3f4f6">
+      <span class="text-sm text-muted">{{ row[0] }}</span>
+      <span class="text-sm fw-600 font-mono">{{ row[1] }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<div>
+  <div class="card mb-16">
+    <div class="card-header"><div class="card-title"><i class="ti ti-file-certificate"></i> Government IDs</div></div>
+    <div class="card-body">
+      {% for lbl, val in [('TIN', emp.tin), ('SSS', emp.sss_no), ('PhilHealth', emp.philhealth_no), ('Pag-IBIG', emp.pagibig_no)] %}
+      <div class="d-flex justify-between" style="padding:7px 0;border-bottom:1px solid #f3f4f6">
+        <span class="text-sm text-muted">{{ lbl }}</span>
+        <span class="text-sm font-mono">{{ val or '—' }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card mb-16">
+    <div class="card-header"><div class="card-title"><i class="ti ti-calendar-off"></i> Leave Credits ({{ now().year if now is defined else '2026' }})</div></div>
+    <div class="table-responsive"><table>
+      <thead><tr><th>Type</th><th>Allocated</th><th>Used</th><th>Balance</th></tr></thead>
+      <tbody>
+      {% for lc in leaves %}
+      <tr>
+        <td>{{ lc.leave_type }}</td>
+        <td>{{ lc.allocated_days }}</td>
+        <td>{{ lc.used_days }}</td>
+        <td class="fw-600 text-success">{{ lc.balance_days }}</td>
+      </tr>
+      {% else %}<tr><td colspan="4" class="text-center text-muted">No leave credits</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title"><i class="ti ti-cash"></i> Recent Payslips</div></div>
+    <div class="table-responsive"><table>
+      <thead><tr><th>Period</th><th>Gross</th><th>Net Pay</th></tr></thead>
+      <tbody>
+      {% for pr in recent_payroll %}
+      <tr>
+        <td class="text-sm">{{ pr.period_label }}</td>
+        <td class="font-mono text-sm">₱{{ "{:,.2f}".format(pr.gross_salary or 0) }}</td>
+        <td class="font-mono text-sm fw-600 text-primary">₱{{ "{:,.2f}".format(pr.net_pay or 0) }}</td>
+      </tr>
+      {% else %}<tr><td colspan="3" class="text-center text-muted">No payroll records</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+</div>
+{% endblock %}

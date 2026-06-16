@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Compute Payroll{% endblock %}
+{% block page_title %}Compute Payroll{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('payroll.index') }}">Payroll</a> / Compute{% endblock %}
+{% block content %}
+<div class="card mb-16">
+<div class="card-body">
+  <div class="d-flex align-center gap-8">
+    <div class="stat-icon blue" style="width:48px;height:48px"><i class="ti ti-calculator" style="font-size:24px"></i></div>
+    <div>
+      <div class="fw-600" style="font-size:16px">{{ period.period_label }}</div>
+      <div class="text-muted">{{ period.date_from }} to {{ period.date_to }} · {{ employees|length }} employees · {{ period.payroll_group }}</div>
+    </div>
+    <div style="margin-left:auto">
+      <form method="post">
+        <button class="btn btn-primary" type="submit" style="padding:12px 24px"><i class="ti ti-calculator"></i> Run Payroll Computation</button>
+      </form>
+    </div>
+  </div>
+</div></div>
+<div class="card">
+<div class="card-header"><div class="card-title">Employees in this payroll ({{ employees|length }})</div></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Employee</th><th>Dept</th><th>Pay Group</th><th>Daily Rate</th><th>Tax Type</th></tr></thead>
+<tbody>
+{% for e in employees %}<tr>
+  <td><div class="fw-600">{{ e.last_name }}, {{ e.first_name }}</div><div class="text-sm text-muted">{{ e.employee_no }}</div></td>
+  <td class="text-muted text-sm">{{ e.position_title or '—' }}</td>
+  <td><span class="badge badge-{{ 'blue' if e.payroll_group=='MONTHLY' else 'gray' }}">{{ e.payroll_group }}</span></td>
+  <td class="font-mono">₱{{ "{:,.2f}".format(e.daily_rate or 0) }}</td>
+  <td><span class="badge badge-{{ 'green' if e.tax_type=='MWE' else 'blue' }}">{{ e.tax_type }}</span></td>
+</tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

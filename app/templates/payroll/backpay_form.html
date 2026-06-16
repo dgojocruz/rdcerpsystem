@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}Backpay — {{ emp.last_name }}{% endblock %}
+{% block page_title %}Backpay Computation{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('payroll.index') }}">Payroll</a> / Backpay{% endblock %}
+{% block content %}
+<div class="card" style="max-width:680px">
+<div class="card-header">
+  <div class="card-title">Backpay / Final Pay — {{ emp.last_name }}, {{ emp.first_name }}</div>
+</div>
+<div class="card-body">
+<form method="post">
+  <div class="alert alert-info mb-16">
+    <i class="ti ti-info-circle"></i>
+    Employee: <strong>{{ emp.employee_no }}</strong> · Daily Rate: <strong>₱{{ "{:,.2f}".format(emp.daily_rate or 0) }}</strong>
+  </div>
+  <div class="section-divider">Separation Details</div>
+  <div class="form-row cols-2">
+    <div class="form-group">
+      <label class="form-label">Last Day Worked</label>
+      <input name="last_day_worked" type="date" class="form-control" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Separation Type</label>
+      <select name="separation_type" class="form-control">
+        <option value="RESIGNED">Resigned</option>
+        <option value="TERMINATED">Terminated (Just Cause)</option>
+        <option value="RETRENCHED">Retrenched / Authorized Cause</option>
+        <option value="RETIRED">Retired</option>
+        <option value="END_OF_CONTRACT">End of Contract</option>
+      </select>
+    </div>
+  </div>
+  <div class="section-divider">Unpaid Compensation</div>
+  <div class="form-row cols-2">
+    <div class="form-group">
+      <label class="form-label">Unpaid Days (last pay period)</label>
+      <input name="unpaid_days" type="number" step="0.5" class="form-control" value="0" oninput="calc()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Computed Amount</label>
+      <input id="unpaid_amt" class="form-control font-mono" readonly style="background:#f9fafb"
+             value="₱{{ "{:,.2f}".format(0) }}">
+    </div>
+  </div>
+  <div class="section-divider">Leave Conversion (Cash Equivalent)</div>
+  <div class="form-row cols-2">
+    <div class="form-group">
+      <label class="form-label">Unused VL Days <span class="text-muted">(balance: {{ leave_map.get('VL', 0) }} days)</span></label>
+      <input name="unused_vl" type="number" step="0.5" class="form-control"
+             value="{{ leave_map.get('VL', 0) }}" max="{{ leave_map.get('VL', 99) }}" oninput="calc()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Unused SL Days <span class="text-muted">(balance: {{ leave_map.get('SL', 0) }} days)</span></label>
+      <input name="unused_sl" type="number" step="0.5" class="form-control"
+             value="{{ leave_map.get('SL', 0) }}" max="{{ leave_map.get('SL', 99) }}" oninput="calc()">
+    </div>
+  </div>
+  <div class="section-divider">Other Components</div>
+  <div class="form-row cols-2">
+    <div class="form-group">
+      <label class="form-label">Pro-rated 13th Month Pay (₱)</label>
+      <input name="pro_rated_13th" type="number" step="0.01" class="form-control" value="0" oninput="calc()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Separation Pay (if applicable) (₱)</label>
+      <input name="separation_pay" type="number" step="0.01" class="form-control" value="0" oninput="calc()">
+    </div>
+  </div>
+  <div style="background:#f9fafb;border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">
+    <div class="fw-600 mb-8">Estimated Gross Backpay</div>
+    <div id="summary" style="font-size:18px;font-weight:700;color:#1a56db">₱0.00</div>
+  </div>
+  <div class="d-flex justify-between">
+    <a href="{{ url_for('employees.view', emp_id=emp.id) }}" class="btn">Cancel</a>
+    <button type="submit" class="btn btn-primary"><i class="ti ti-file-text"></i> Generate Backpay Slip</button>
+  </div>
+</form>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const dailyRate = {{ emp.daily_rate or 0 }};
+function calc() {
+  const unpaidDays = parseFloat(document.querySelector('[name=unpaid_days]').value) || 0;
+  const unusedVL = parseFloat(document.querySelector('[name=unused_vl]').value) || 0;
+  const unusedSL = parseFloat(document.querySelector('[name=unused_sl]').value) || 0;
+  const pro13th = parseFloat(document.querySelector('[name=pro_rated_13th]').value) || 0;
+  const sepPay = parseFloat(document.querySelector('[name=separation_pay]').value) || 0;
+  const unpaidAmt = unpaidDays * dailyRate;
+  const vlCash = unusedVL * dailyRate;
+  const slCash = unusedSL * dailyRate;
+  const gross = unpaidAmt + vlCash + slCash + pro13th + sepPay;
+  document.getElementById('unpaid_amt').value = '₱' + unpaidAmt.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+  document.getElementById('summary').textContent = '₱' + gross.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+calc();
+</script>
+{% endblock %}

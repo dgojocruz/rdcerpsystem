@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Adjustment Audit Log{% endblock %}
+{% block page_title %}Attendance Adjustment Audit Log{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('timekeeping.index') }}">Timekeeping</a> / Audit Log{% endblock %}
+{% block content %}
+<div class="alert alert-info mb-16">
+  <i class="ti ti-shield-check"></i>
+  All attendance adjustments made by HR/Admin are permanently recorded here and cannot be deleted.
+</div>
+<div class="card">
+<div class="card-header"><div class="card-title">Adjustment History ({{ records|length }} records)</div></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Adjusted At</th><th>Employee</th><th>Date</th><th>Field</th><th>Before</th><th>After</th><th>Reason</th><th>Adjusted By</th></tr></thead>
+<tbody>
+{% for r in records %}
+<tr>
+  <td class="font-mono text-sm">{{ r.adjusted_at[:16] if r.adjusted_at else '—' }}</td>
+  <td><div class="fw-600">{{ r.last_name }}, {{ r.first_name }}</div><div class="text-sm text-muted">{{ r.employee_no }}</div></td>
+  <td class="font-mono">{{ r.work_date }}</td>
+  <td><span class="badge badge-blue">{{ r.field_changed }}</span></td>
+  <td class="font-mono text-sm text-muted">{{ r.old_value or '—' }}</td>
+  <td class="font-mono text-sm fw-600">{{ r.new_value or '—' }}</td>
+  <td class="text-sm">{{ r.reason }}</td>
+  <td class="text-sm text-muted">{{ r.adj_by_name or '—' }}</td>
+</tr>
+{% else %}
+<tr><td colspan="8" class="text-center" style="padding:24px;color:#6b7280">No adjustments recorded yet.</td></tr>
+{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

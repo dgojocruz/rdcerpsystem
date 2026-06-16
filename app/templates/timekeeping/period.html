@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Period Summary{% endblock %}
+{% block page_title %}Attendance Period Summary{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('timekeeping.index') }}">Timekeeping</a> / Period{% endblock %}
+{% block content %}
+<div class="card mb-16">
+<div class="card-body">
+<form method="get" class="d-flex gap-8 align-center">
+  <div class="form-group mb-0"><label class="form-label">From</label><input type="date" name="from" value="{{ date_from }}" class="form-control"></div>
+  <div class="form-group mb-0"><label class="form-label">To</label><input type="date" name="to" value="{{ date_to }}" class="form-control"></div>
+  <div style="margin-top:20px"><button class="btn btn-primary" type="submit"><i class="ti ti-search"></i> Generate</button></div>
+</form>
+</div></div>
+{% if records %}
+<div class="card">
+<div class="card-header"><div class="card-title">Period: {{ date_from }} to {{ date_to }}</div><button class="btn btn-sm"><i class="ti ti-download"></i> Export</button></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Emp No</th><th>Employee Name</th><th>Pay Group</th><th>Days Present</th><th>Late (min)</th><th>Undertime (min)</th><th>OT Hours</th><th>ND Hours</th><th>Absent</th></tr></thead>
+<tbody>
+{% for r in records %}
+<tr>
+  <td class="font-mono text-sm">{{ r.employee_no }}</td>
+  <td class="fw-600">{{ r.last_name }}, {{ r.first_name }}</td>
+  <td><span class="badge badge-{{ 'blue' if r.payroll_group=='MONTHLY' else 'gray' }}">{{ r.payroll_group }}</span></td>
+  <td>{{ r.days_present }}</td>
+  <td>{% if r.total_late %}<span class="text-danger">{{ r.total_late }}</span>{% else %}—{% endif %}</td>
+  <td>{{ r.total_ut or '—' }}</td>
+  <td class="font-mono">{{ "{:.2f}".format(r.total_ot or 0) }}</td>
+  <td class="font-mono">{{ "{:.2f}".format(r.total_nd or 0) }}</td>
+  <td>{{ r.days_absent or '—' }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table></div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Payslip</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px;color:#111}
+.ps{max-width:700px;margin:0 auto;border:1px solid #ccc;padding:24px}
+h2{font-size:15px;margin:0 0 4px;text-align:center}
+.co{text-align:center;margin-bottom:16px}
+.co p{margin:2px 0;font-size:11px;color:#555}
+hr{border:none;border-top:1px solid #ccc;margin:10px 0}
+.row{display:flex;justify-content:space-between;padding:3px 0}
+.section{margin-bottom:12px}
+.section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:4px}
+.total{font-size:14px;font-weight:bold;display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #111}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+.emp-info{background:#f9f9f9;padding:10px;margin-bottom:16px;font-size:11px}
+.emp-info b{font-size:13px;display:block;margin-bottom:4px}
+@media print{body{padding:0}.no-print{display:none}}
+</style>
+</head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:16px">
+<button onclick="window.print()" style="padding:8px 20px;background:#1a56db;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Print Payslip</button>
+</div>
+<div class="ps">
+<div class="co">
+  <h2>{{ company.company_name if company else 'Company' }}</h2>
+  <p>{{ company.address if company else '' }}</p>
+  <p><strong>PAYSLIP</strong></p>
+  <p>Pay Period: {{ r.period_label }} | {{ r.date_from }} to {{ r.date_to }}</p>
+</div>
+<div class="emp-info">
+  <b>{{ r.last_name }}, {{ r.first_name }} {{ r.middle_name or '' }}</b>
+  <div>{{ r.position_title or '' }} | {{ r.dept_name or '' }} | {{ r.employee_no }}</div>
+  <div>TIN: {{ r.tin or '—' }} | SSS: {{ r.sss_no or '—' }} | PhilHealth: {{ r.philhealth_no or '—' }} | Pag-IBIG: {{ r.pagibig_no or '—' }}</div>
+</div>
+<div class="grid">
+<div>
+<div class="section">
+<div class="section-title">Earnings</div>
+<div class="row"><span>Regular Pay ({{ "{:.2f}".format(r.total_hours or 0) }} hrs)</span><span>₱{{ "{:,.2f}".format(r.regular_amount or 0) }}</span></div>
+{% if r.late_amount %}<div class="row"><span>Less: Late</span><span style="color:red">(₱{{ "{:,.2f}".format(r.late_amount) }})</span></div>{% endif %}
+{% if r.undertime_amount %}<div class="row"><span>Less: Undertime</span><span style="color:red">(₱{{ "{:,.2f}".format(r.undertime_amount) }})</span></div>{% endif %}
+{% if r.vl_amount %}<div class="row"><span>Vacation Leave</span><span>₱{{ "{:,.2f}".format(r.vl_amount) }}</span></div>{% endif %}
+{% if r.sl_amount %}<div class="row"><span>Sick Leave</span><span>₱{{ "{:,.2f}".format(r.sl_amount) }}</span></div>{% endif %}
+<div class="row" style="font-weight:bold;border-top:1px solid #eee;margin-top:4px;padding-top:4px"><span>Basic Salary</span><span>₱{{ "{:,.2f}".format(r.basic_salary or 0) }}</span></div>
+{% if r.ot_amount %}<div class="row"><span>Overtime ({{ "{:.2f}".format(r.ot_hours or 0) }} hrs)</span><span>₱{{ "{:,.2f}".format(r.ot_amount) }}</span></div>{% endif %}
+{% if r.nd_amount %}<div class="row"><span>Night Differential</span><span>₱{{ "{:,.2f}".format(r.nd_amount) }}</span></div>{% endif %}
+{% if r.sunday_amount %}<div class="row"><span>Sunday/Rest Day</span><span>₱{{ "{:,.2f}".format(r.sunday_amount) }}</span></div>{% endif %}
+{% if r.special_holiday_amount %}<div class="row"><span>Special Holiday</span><span>₱{{ "{:,.2f}".format(r.special_holiday_amount) }}</span></div>{% endif %}
+{% if r.legal_holiday_amount %}<div class="row"><span>Legal Holiday</span><span>₱{{ "{:,.2f}".format(r.legal_holiday_amount) }}</span></div>{% endif %}
+{% if r.allowance_amount %}<div class="row"><span>Non-Taxable Allowance</span><span>₱{{ "{:,.2f}".format(r.allowance_amount) }}</span></div>{% endif %}
+<div class="row" style="font-weight:bold;border-top:1px solid #eee;margin-top:4px;padding-top:4px"><span>GROSS PAY</span><span>₱{{ "{:,.2f}".format(r.gross_salary or 0) }}</span></div>
+</div></div>
+<div>
+<div class="section">
+<div class="section-title">Deductions</div>
+<div class="row"><span>SSS Employee Share</span><span>₱{{ "{:,.2f}".format(r.sss_employee or 0) }}</span></div>
+{% if r.sss_wisp %}<div class="row"><span>SSS WISP</span><span>₱{{ "{:,.2f}".format(r.sss_wisp) }}</span></div>{% endif %}
+<div class="row"><span>PhilHealth</span><span>₱{{ "{:,.2f}".format(r.philhealth_employee or 0) }}</span></div>
+<div class="row"><span>Pag-IBIG</span><span>₱{{ "{:,.2f}".format(r.pagibig_employee or 0) }}</span></div>
+{% if r.withholding_tax %}<div class="row"><span>Withholding Tax</span><span>₱{{ "{:,.2f}".format(r.withholding_tax) }}</span></div>{% endif %}
+{% if r.sss_loan %}<div class="row"><span>SSS Loan</span><span>₱{{ "{:,.2f}".format(r.sss_loan) }}</span></div>{% endif %}
+{% if r.sss_calamity_loan %}<div class="row"><span>SSS Calamity Loan</span><span>₱{{ "{:,.2f}".format(r.sss_calamity_loan) }}</span></div>{% endif %}
+{% if r.pagibig_loan %}<div class="row"><span>Pag-IBIG Loan</span><span>₱{{ "{:,.2f}".format(r.pagibig_loan) }}</span></div>{% endif %}
+{% if r.cash_advance %}<div class="row"><span>Cash Advance</span><span>₱{{ "{:,.2f}".format(r.cash_advance) }}</span></div>{% endif %}
+{% if r.house_rent %}<div class="row"><span>House Rent</span><span>₱{{ "{:,.2f}".format(r.house_rent) }}</span></div>{% endif %}
+{% if r.ar_water %}<div class="row"><span>AR Water</span><span>₱{{ "{:,.2f}".format(r.ar_water) }}</span></div>{% endif %}
+<div class="row" style="font-weight:bold;border-top:1px solid #eee;margin-top:4px;padding-top:4px"><span>TOTAL DEDUCTIONS</span><span style="color:red">₱{{ "{:,.2f}".format(r.total_deductions or 0) }}</span></div>
+</div></div>
+</div>
+<hr>
+<div class="total"><span>NET PAY</span><span>₱{{ "{:,.2f}".format(r.net_pay or 0) }}</span></div>
+<hr>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:32px;font-size:11px;text-align:center">
+  <div><div style="border-top:1px solid #111;padding-top:6px;margin-top:48px">Received by / Employee Signature</div></div>
+  <div><div style="border-top:1px solid #111;padding-top:6px;margin-top:48px">Prepared by / Authorized Signatory</div></div>
+</div>
+</div>
+</body></html>

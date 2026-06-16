@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}13th Month Pay{% endblock %}
+{% block page_title %}13th Month Pay Computation{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('payroll.index') }}">Payroll</a> / 13th Month{% endblock %}
+{% block content %}
+<div class="card mb-16">
+<div class="card-header"><div class="card-title">Compute 13th Month Pay</div></div>
+<div class="card-body">
+<form method="post" class="d-flex gap-8 align-center flex-wrap">
+  <div class="form-group mb-0">
+    <label class="form-label">Year</label>
+    <input name="year" type="number" class="form-control" style="width:100px" value="{{ year }}" min="2020" max="2030">
+  </div>
+  <div class="form-group mb-0">
+    <label class="form-label">Payroll Group</label>
+    <select name="payroll_group" class="form-control" style="width:160px">
+      <option value="ALL" {% if group=='ALL' %}selected{% endif %}>All Employees</option>
+      <option value="MONTHLY" {% if group=='MONTHLY' %}selected{% endif %}>Monthly</option>
+      <option value="WEEKLY" {% if group=='WEEKLY' %}selected{% endif %}>Weekly</option>
+    </select>
+  </div>
+  <div style="margin-top:20px">
+    <button type="submit" class="btn btn-primary"><i class="ti ti-calculator"></i> Compute</button>
+  </div>
+</form>
+</div></div>
+
+{% if results %}
+{% set total_13th = results | sum(attribute='thirteenth_month') %}
+<div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+<div class="stat-card"><div class="stat-icon green"><i class="ti ti-users"></i></div>
+  <div class="stat-val">{{ results|length }}</div><div class="stat-label">Employees</div></div>
+<div class="stat-card"><div class="stat-icon amber"><i class="ti ti-cash"></i></div>
+  <div class="stat-val">₱{{ "{:,.2f}".format(total_13th) }}</div>
+  <div class="stat-label">Total 13th Month</div><div class="stat-sub">For year {{ year }}</div></div>
+<div class="stat-card"><div class="stat-icon blue"><i class="ti ti-chart-bar"></i></div>
+  <div class="stat-val">₱{{ "{:,.2f}".format(total_13th / results|length if results else 0) }}</div>
+  <div class="stat-label">Average per Employee</div></div>
+</div>
+
+<div class="card">
+<div class="card-header">
+  <div class="card-title">13th Month Pay — {{ year }}</div>
+  <button onclick="window.print()" class="btn btn-sm"><i class="ti ti-printer"></i> Print</button>
+</div>
+<div class="table-responsive"><table>
+<thead><tr><th>Emp No</th><th>Employee Name</th><th>Group</th><th>Months Worked</th><th>Total Basic Pay ({{ year }})</th><th>13th Month Pay</th></tr></thead>
+<tbody>
+{% for r in results %}
+<tr>
+  <td class="font-mono text-sm">{{ r.employee_no }}</td>
+  <td class="fw-600">{{ r.last_name }}, {{ r.first_name }}</td>
+  <td><span class="badge badge-{{ 'blue' if r.payroll_group=='MONTHLY' else 'gray' }}">{{ r.payroll_group }}</span></td>
+  <td class="text-center">{{ r.months_worked or '—' }}</td>
+  <td class="font-mono">₱{{ "{:,.2f}".format(r.total_basic) }}</td>
+  <td class="font-mono fw-600 text-success">₱{{ "{:,.2f}".format(r.thirteenth_month) }}</td>
+</tr>
+{% endfor %}
+</tbody>
+<tfoot><tr style="background:#f9fafb;font-weight:600">
+  <td colspan="4">GRAND TOTAL</td>
+  <td class="font-mono">₱{{ "{:,.2f}".format(results|sum(attribute='total_basic')) }}</td>
+  <td class="font-mono text-success">₱{{ "{:,.2f}".format(total_13th) }}</td>
+</tr></tfoot>
+</table></div></div>
+
+<div style="margin-top:12px;font-size:11px;color:var(--text-muted);padding:10px;background:#fffbeb;border-radius:var(--radius);border:1px solid #fcd34d">
+  <i class="ti ti-info-circle"></i>
+  <strong>Formula:</strong> 13th Month = Total Basic Pay for {{ year }} ÷ 12.
+  As mandated by Presidential Decree No. 851. Tax-exempt up to ₱90,000 under TRAIN Law.
+</div>
+{% endif %}
+{% endblock %}

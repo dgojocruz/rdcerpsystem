@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Org Chart{% endblock %}
+{% block page_title %}Organizational Chart{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for("employees.index") }}">Employees</a> / Org Chart{% endblock %}
+{% block extra_css %}
+<style>#chart-container{overflow:auto;min-height:400px;background:#f9fafb;border-radius:var(--r);padding:20px}.node-box{background:#fff;border:1px solid var(--bdr);border-radius:8px;padding:10px 14px;min-width:140px;text-align:center;box-shadow:var(--shad);display:inline-block;cursor:pointer;transition:box-shadow .15s}.node-box:hover{box-shadow:0 4px 12px rgba(0,0,0,.12)}.node-av{width:36px;height:36px;border-radius:50%;background:#eff6ff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;margin:0 auto 6px}.node-name{font-size:12px;font-weight:600;color:var(--txt)}.node-pos{font-size:11px;color:var(--muted)}.edge{stroke:#e5e7eb;stroke-width:1.5;fill:none}</style>
+{% endblock %}
+{% block content %}
+<div class="card">
+<div class="card-header"><div class="card-title">Reporting Structure</div><span class="text-sm text-muted">{{ employees|length }} active employees</span></div>
+<div class="card-body" id="chart-container"><svg id="org-svg" width="100%" style="min-height:500px"></svg></div>
+</div>
+<script>
+const employees = {{ employees|tojson }};
+function buildTree(){
+  const map={};const roots=[];
+  employees.forEach(e=>{ map[e.id]={...e,children:[]}; });
+  employees.forEach(e=>{
+    if(e.manager_id&&map[e.manager_id]) map[e.manager_id].children.push(map[e.id]);
+    else roots.push(map[e.id]);
+  });
+  return roots;
+}
+function calcLayout(nodes,x,y,hGap){
+  let w=0;
+  nodes.forEach(n=>{
+    const cw=n.children.length?calcLayout(n.children,x+w,y+100,hGap):160;
+    n._x=x+w+cw/2-80; n._y=y;
+    w+=cw+20;
+  });
+  return w||160;
+}
+function renderSVG(){
+  const roots=buildTree();
+  calcLayout(roots,40,40,20);
+  const svgEl=document.getElementById("org-svg");
+  const allNodes=[]; function collectAll(ns){ns.forEach(n=>{allNodes.push(n);collectAll(n.children);})}
+  collectAll(roots);
+  const maxX=Math.max(...allNodes.map(n=>n._x+160))+40;
+  const maxY=Math.max(...allNodes.map(n=>n._y+80))+60;
+  svgEl.setAttribute("viewBox","0 0 "+maxX+" "+maxY);
+  let html="";
+  allNodes.forEach(n=>{
+    n.children.forEach(c=>{
+      const px=n._x+80,py=n._y+70,cx=c._x+80,cy=c._y;
+      const my=(py+cy)/2;
+      html+=`<path d="M${px} ${py} L${px} ${my} L${cx} ${my} L${cx} ${cy}" class="edge"/>`;
+    });
+  });
+  allNodes.forEach(n=>{
+    const initials=(n.last_name[0]||"")+(n.first_name[0]||"");
+    html+=`<foreignObject x="${n._x}" y="${n._y}" width="160" height="75">
+      <div xmlns="http://www.w3.org/1999/xhtml" class="node-box" onclick="window.location='/employees/${n.id}'">
+        <div class="node-av">${initials}</div>
+        <div class="node-name">${n.last_name}, ${n.first_name}</div>
+        <div class="node-pos">${n.position_title||n.dept_name||""}</div>
+      </div></foreignObject>`;
+  });
+  svgEl.innerHTML=html;
+}
+renderSVG();
+</script>
+{% endblock %}

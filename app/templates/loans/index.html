@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}Loans{% endblock %}
+{% block page_title %}Employee Loan Tracker{% endblock %}
+{% block breadcrumb %}Loans{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('loans.add') }}" class="btn btn-primary"><i class="ti ti-plus"></i> Add Loan</a>
+{% endblock %}
+{% block content %}
+<div class="stats-grid">
+{% for t in totals %}
+<div class="stat-card">
+  <div class="stat-icon {{ 'blue' if t.loan_category=='SSS' else 'green' if t.loan_category=='PAGIBIG' else 'amber' if t.loan_category=='PERSONAL' else 'gray' }}">
+    <i class="ti ti-credit-card"></i></div>
+  <div class="stat-val">₱{{ "{:,.0f}".format(t.total_balance or 0) }}</div>
+  <div class="stat-label">{{ t.loan_category }} Outstanding</div>
+  <div class="stat-sub">{{ t.count }} active · ₱{{ "{:,.0f}".format(t.total_monthly or 0) }}/mo deducted</div>
+</div>
+{% endfor %}
+</div>
+<div class="card mb-16">
+<div class="card-body" style="padding:10px 14px">
+<form method="get" class="d-flex gap-8 align-center">
+  <select name="category" class="form-control" style="width:160px">
+    <option value="">All Categories</option>
+    {% for cat in ['SSS','PAGIBIG','PERSONAL','OTHER'] %}
+    <option {% if category_filter==cat %}selected{% endif %} value="{{ cat }}">{{ cat }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" class="form-control" style="width:130px">
+    <option value="ACTIVE" {% if status_filter=='ACTIVE' %}selected{% endif %}>Active</option>
+    <option value="PAID" {% if status_filter=='PAID' %}selected{% endif %}>Paid</option>
+    <option value="" {% if not status_filter %}selected{% endif %}>All Status</option>
+  </select>
+  <button class="btn btn-primary" type="submit"><i class="ti ti-search"></i> Filter</button>
+</form>
+</div></div>
+<div class="card">
+<div class="card-header"><div class="card-title">Loan Records ({{ loans|length }})</div></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Employee</th><th>Category</th><th>Loan Type</th><th>Principal</th><th>Balance</th><th>Monthly Ded.</th><th>Total Paid</th><th>Status</th><th>Action</th></tr></thead>
+<tbody>
+{% for l in loans %}
+<tr>
+  <td><div class="fw-600">{{ l.last_name }}, {{ l.first_name }}</div><div class="text-sm text-muted">{{ l.employee_no }}</div></td>
+  <td><span class="badge badge-{{ 'blue' if l.loan_category=='SSS' else 'green' if l.loan_category=='PAGIBIG' else 'amber' }}">{{ l.loan_category }}</span></td>
+  <td class="text-sm">{{ l.loan_type }}</td>
+  <td class="font-mono">₱{{ "{:,.2f}".format(l.principal_amount) }}</td>
+  <td class="font-mono fw-600 text-danger">₱{{ "{:,.2f}".format(l.outstanding_balance) }}</td>
+  <td class="font-mono">₱{{ "{:,.2f}".format(l.monthly_amortization) }}</td>
+  <td class="font-mono text-success">₱{{ "{:,.2f}".format(l.total_paid or 0) }}</td>
+  <td><span class="badge badge-{{ 'green' if l.status=='PAID' else 'amber' if l.status=='ACTIVE' else 'gray' }}">{{ l.status }}</span></td>
+  <td>
+    {% if l.status == 'ACTIVE' %}
+    <button class="btn btn-xs" onclick="openPayment({{ l.id }}, '{{ l.last_name }}, {{ l.first_name }}', {{ l.monthly_amortization }})">
+      <i class="ti ti-receipt"></i> Pay
+    </button>
+    {% endif %}
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="9" class="text-center" style="padding:24px;color:#6b7280">No loans found. <a href="{{ url_for('loans.add') }}">Add one →</a></td></tr>
+{% endfor %}
+</tbody></table></div></div>
+
+<div class="modal-backdrop" id="paymentModal">
+<div class="modal-dialog">
+  <div class="modal-header">
+    <div class="modal-title">Record Payment</div>
+    <button class="btn btn-xs" onclick="closeModal('paymentModal')"><i class="ti ti-x"></i></button>
+  </div>
+  <form id="paymentForm" method="post">
+    <div class="modal-body">
+      <p class="mb-16" id="paymentDesc"></p>
+      <div class="form-group">
+        <label class="form-label">Payment Amount (₱)</label>
+        <input name="amount" id="paymentAmt" type="number" step="0.01" class="form-control font-mono" required>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeModal('paymentModal')">Cancel</button>
+      <button type="submit" class="btn btn-success"><i class="ti ti-check"></i> Record Payment</button>
+    </div>
+  </form>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function openPayment(id, name, monthly) {
+  document.getElementById('paymentDesc').textContent = 'Employee: ' + name;
+  document.getElementById('paymentAmt').value = monthly.toFixed(2);
+  document.getElementById('paymentForm').action = '/loans/' + id + '/payment';
+  openModal('paymentModal');
+}
+</script>
+{% endblock %}

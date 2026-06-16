@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+{% block title %}{{ action }} Employee{% endblock %}
+{% block page_title %}{{ action }} Employee{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('employees.index') }}">Employees</a> / {{ action }}{% endblock %}
+{% block content %}
+<form method="post">
+<div class="grid-2 mb-16">
+
+<!-- ── Personal Information ─────────────────────────────── -->
+<div class="card" style="grid-column:1/-1">
+  <div class="card-header"><div class="card-title"><i class="ti ti-user"></i> Personal Information</div></div>
+  <div class="card-body">
+    <div class="form-row cols-3">
+      <div class="form-group">
+        <label class="form-label">Last Name *</label>
+        <input name="last_name" class="form-control" required value="{{ employee.last_name if employee else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">First Name *</label>
+        <input name="first_name" class="form-control" required value="{{ employee.first_name if employee else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Middle Name</label>
+        <input name="middle_name" class="form-control" value="{{ employee.middle_name if employee else '' }}">
+      </div>
+    </div>
+    <div class="form-row cols-4">
+      <div class="form-group">
+        <label class="form-label">Gender</label>
+        <select name="gender" class="form-control">
+          <option value="">Select</option>
+          <option {% if employee and employee.gender=='Male' %}selected{% endif %}>Male</option>
+          <option {% if employee and employee.gender=='Female' %}selected{% endif %}>Female</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Civil Status</label>
+        <select name="civil_status" class="form-control">
+          {% for s in ['Single','Married','Widowed','Separated'] %}
+          <option {% if employee and employee.civil_status==s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input name="phone" class="form-control" value="{{ employee.phone if employee else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input name="email" type="email" class="form-control" value="{{ employee.email if employee else '' }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Address</label>
+      <input name="address" class="form-control" value="{{ employee.address if employee else '' }}" placeholder="Street, Barangay, City">
+    </div>
+  </div>
+</div>
+
+<!-- ── Employment Details ──────────────────────────────── -->
+<div class="card">
+  <div class="card-header"><div class="card-title"><i class="ti ti-briefcase"></i> Employment Details</div></div>
+  <div class="card-body">
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label class="form-label">Department</label>
+        <select name="department_id" class="form-control">
+          <option value="">— Select Department —</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {% if employee and employee.department_id==d.id %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Position / Job Title</label>
+        <input name="position_title" class="form-control" value="{{ employee.position_title if employee else '' }}">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label class="form-label">Dept. Type</label>
+        <select name="dept_type" class="form-control">
+          <option value="IND" {% if not employee or employee.dept_type=='IND' %}selected{% endif %}>IND — Indirect</option>
+          <option value="DL"  {% if employee and employee.dept_type=='DL'  %}selected{% endif %}>DL — Direct Labor</option>
+          <option value="ADM" {% if employee and employee.dept_type=='ADM' %}selected{% endif %}>ADM — Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Employment Type</label>
+        <select name="employment_type" class="form-control">
+          {% for t in ['REGULAR','PROBATIONARY','CONTRACTUAL','CASUAL'] %}
+          <option {% if employee and employee.employment_type==t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label class="form-label">Date Hired</label>
+        <input name="date_hired" type="date" class="form-control" value="{{ employee.date_hired if employee else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Biometric ID</label>
+        <input name="biometric_id" class="form-control" placeholder="Device fingerprint ID" value="{{ employee.biometric_id if employee else '' }}">
+      </div>
+    </div>
+
+    <!-- ── Reports To ── -->
+    <div class="form-group" style="margin-top:4px">
+      <label class="form-label" style="display:flex;align-items:center;gap:6px">
+        <i class="ti ti-hierarchy" style="color:var(--primary)"></i>
+        Reports To <span class="text-muted" style="font-weight:400">(Direct Manager)</span>
+      </label>
+      <select name="manager_id" class="form-control" id="managerSelect">
+        <option value="">— No Manager / Top Level —</option>
+        {% for m in managers %}
+        <option value="{{ m.id }}"
+          {% if employee and employee.manager_id == m.id %}selected{% endif %}>
+          {{ m.last_name }}, {{ m.first_name }} — {{ m.employee_no }}
+        </option>
+        {% endfor %}
+      </select>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:3px">
+        Used to build the organizational chart hierarchy
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Salary & Pay ────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header"><div class="card-title"><i class="ti ti-cash"></i> Salary & Pay</div></div>
+  <div class="card-body">
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label class="form-label">Payroll Group</label>
+        <select name="payroll_group" class="form-control">
+          <option value="MONTHLY" {% if not employee or employee.payroll_group=='MONTHLY' %}selected{% endif %}>Monthly (Semi-Monthly)</option>
+          <option value="WEEKLY"  {% if employee and employee.payroll_group=='WEEKLY'  %}selected{% endif %}>Weekly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Method</label>
+        <select name="payment_method" class="form-control">
+          {% for pm in ['ATM','CASH','CHECK'] %}
+          <option {% if employee and employee.payment_method==pm %}selected{% endif %}>{{ pm }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label class="form-label">Daily Rate (₱)</label>
+        <input name="daily_rate" type="number" step="0.01" min="0" class="form-control"
+               value="{{ employee.daily_rate if employee else 695 }}" oninput="calcRates(this)">
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">NCR min wage: ₱645/day</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Allowance / Non-taxable (₱)</label>
+        <input name="allowance_amount" type="number" step="0.01" min="0" class="form-control"
+               value="{{ employee.allowance_amount if employee else 0 }}">
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label class="form-label">Tax Type</label>
+        <select name="tax_type" class="form-control">
+          <option value="AWE" {% if not employee or employee.tax_type=='AWE' %}selected{% endif %}>AWE — Above Minimum Wage</option>
+          <option value="MWE" {% if employee and employee.tax_type=='MWE' %}selected{% endif %}>MWE — Minimum Wage Earner (Tax Exempt)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bank Name</label>
+        <input name="bank_name" class="form-control" value="{{ employee.bank_name if employee else '' }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Bank Account No.</label>
+      <input name="bank_account_no" class="form-control" value="{{ employee.bank_account_no if employee else '' }}">
+    </div>
+  </div>
+</div>
+
+<!-- ── Government Numbers ─────────────────────────────── -->
+<div class="card" style="grid-column:1/-1">
+  <div class="card-header"><div class="card-title"><i class="ti ti-file-certificate"></i> Government Numbers</div></div>
+  <div class="card-body">
+    <div class="form-row cols-4">
+      <div class="form-group">
+        <label class="form-label">TIN</label>
+        <input name="tin" class="form-control font-mono" placeholder="XXX-XXX-XXX-XXX" value="{{ employee.tin if employee else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">SSS Number</label>
+        <input name="sss_no" class="form-control font-mono" placeholder="XX-XXXXXXX-X" value="{{ employee.sss_no if employee else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">PhilHealth No.</label>
+        <input name="philhealth_no" class="form-control font-mono" placeholder="XX-XXXXXXXXX-X" value="{{ employee.philhealth_no if employee else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pag-IBIG No.</label>
+        <input name="pagibig_no" class="form-control font-mono" placeholder="XXXX-XXXX-XXXX" value="{{ employee.pagibig_no if employee else '' }}">
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /grid-2 -->
+
+<!-- Footer actions -->
+<div class="d-flex gap-8 justify-between" style="padding-bottom:16px">
+  <a href="{{ url_for('employees.index') }}" class="btn"><i class="ti ti-arrow-left"></i> Cancel</a>
+  <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Save Employee</button>
+</div>
+</form>
+
+<script>
+// Show computed hourly rate next to daily rate
+function calcRates(input) {
+  const daily = parseFloat(input.value) || 0;
+  const hourly = (daily / 8).toFixed(2);
+  input.title = `Hourly rate: ₱${hourly}`;
+}
+
+// Manager search filter
+const managerSel = document.getElementById('managerSelect');
+if (managerSel) {
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'relative';
+  managerSel.parentNode.insertBefore(wrapper, managerSel);
+  wrapper.appendChild(managerSel);
+
+  const search = document.createElement('input');
+  search.placeholder = 'Type to search managers...';
+  search.className = 'form-control';
+  search.style.cssText = 'margin-bottom:4px;font-size:12px';
+  wrapper.insertBefore(search, managerSel);
+
+  const options = Array.from(managerSel.options);
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    options.forEach(opt => {
+      opt.style.display = (!q || opt.value === '' || opt.text.toLowerCase().includes(q)) ? '' : 'none';
+    });
+  });
+}
+</script>
+{% endblock %}

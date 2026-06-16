@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Backpay / Final Pay — {{ bp.emp.last_name }}</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px;color:#111}
+.slip{max-width:720px;margin:0 auto;border:2px solid #1a56db;padding:0;border-radius:4px;overflow:hidden}
+.slip-header{background:#1a56db;color:#fff;padding:16px 20px;text-align:center}
+.slip-header h2{margin:0 0 4px;font-size:16px}
+.slip-header p{margin:0;font-size:11px;opacity:.85}
+.slip-badge{display:inline-block;background:#fff;color:#1a56db;font-size:10px;font-weight:700;padding:2px 10px;border-radius:10px;margin-top:6px}
+.emp-info{background:#f0f7ff;padding:12px 20px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px}
+.emp-info .row{display:flex;justify-content:space-between}
+.emp-info .label{color:#6b7280}
+.emp-info .val{font-weight:600}
+.section{padding:12px 20px}
+.section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #e5e7eb}
+.line{display:flex;justify-content:space-between;padding:4px 0;font-size:11px}
+.line.subtotal{font-weight:700;border-top:1px solid #e5e7eb;margin-top:4px;padding-top:6px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.divider{width:1px;background:#e5e7eb}
+.total-bar{background:#1a56db;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
+.total-bar .label{font-size:13px;font-weight:600}
+.total-bar .amount{font-size:20px;font-weight:700}
+.note{font-size:10px;color:#6b7280;padding:10px 20px;border-top:1px solid #e5e7eb;background:#f9fafb}
+.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;padding:16px 20px;margin-top:8px}
+.sig-line{border-top:1px solid #111;margin-top:40px;padding-top:5px;font-size:10px;text-align:center}
+.amt{font-family:monospace}
+.negative{color:#dc2626}
+@media print{.no-print{display:none!important};body{padding:0}}
+</style>
+</head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:16px">
+  <button onclick="window.print()" style="padding:8px 20px;background:#1a56db;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨️ Print Backpay Slip</button>
+  <button onclick="window.close()" style="padding:8px 20px;background:#fff;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-size:13px;margin-left:8px">← Back</button>
+</div>
+<div class="slip">
+  <div class="slip-header">
+    <h2>{{ bp.company.company_name if bp.company else 'Company' }}</h2>
+    <p>{{ bp.company.address if bp.company else '' }}</p>
+    <div class="slip-badge">FINAL PAY / BACKPAY VOUCHER</div>
+    <p style="margin-top:6px;font-size:10px">Last Day Worked: {{ bp.last_day }} · Type: {{ bp.separation_type }}</p>
+  </div>
+  <div class="emp-info">
+    <div class="row"><span class="label">Employee Name</span><span class="val">{{ bp.emp.last_name }}, {{ bp.emp.first_name }}</span></div>
+    <div class="row"><span class="label">Employee No.</span><span class="val">{{ bp.emp.employee_no }}</span></div>
+    <div class="row"><span class="label">Position</span><span class="val">{{ bp.emp.position_title or '—' }}</span></div>
+    <div class="row"><span class="label">Daily Rate</span><span class="val amt">₱{{ "{:,.2f}".format(bp.emp.daily_rate or 0) }}</span></div>
+    <div class="row"><span class="label">SSS No.</span><span class="val">{{ bp.emp.sss_no or '—' }}</span></div>
+    <div class="row"><span class="label">TIN</span><span class="val">{{ bp.emp.tin or '—' }}</span></div>
+  </div>
+  <div class="two-col">
+    <div class="section">
+      <div class="section-title">Earnings</div>
+      {% if bp.unpaid_days > 0 %}
+      <div class="line"><span>Unpaid Salary ({{ bp.unpaid_days }} days)</span><span class="amt">₱{{ "{:,.2f}".format(bp.unpaid_salary) }}</span></div>
+      {% endif %}
+      {% if bp.unused_vl > 0 %}
+      <div class="line"><span>Unused VL ({{ bp.unused_vl }} days)</span><span class="amt">₱{{ "{:,.2f}".format(bp.vl_cash) }}</span></div>
+      {% endif %}
+      {% if bp.unused_sl > 0 %}
+      <div class="line"><span>Unused SL ({{ bp.unused_sl }} days)</span><span class="amt">₱{{ "{:,.2f}".format(bp.sl_cash) }}</span></div>
+      {% endif %}
+      {% if bp.pro_rated_13th > 0 %}
+      <div class="line"><span>Pro-rated 13th Month</span><span class="amt">₱{{ "{:,.2f}".format(bp.pro_rated_13th) }}</span></div>
+      {% endif %}
+      {% if bp.separation_pay > 0 %}
+      <div class="line"><span>Separation Pay</span><span class="amt">₱{{ "{:,.2f}".format(bp.separation_pay) }}</span></div>
+      {% endif %}
+      <div class="line subtotal"><span>Gross Backpay</span><span class="amt">₱{{ "{:,.2f}".format(bp.gross_backpay) }}</span></div>
+    </div>
+    <div class="section">
+      <div class="section-title">Deductions</div>
+      <div class="line"><span>SSS (final)</span><span class="amt negative">(₱{{ "{:,.2f}".format(bp.sss_ee) }})</span></div>
+      <div class="line"><span>PhilHealth (final)</span><span class="amt negative">(₱{{ "{:,.2f}".format(bp.ph_ee) }})</span></div>
+      <div class="line"><span>Pag-IBIG (final)</span><span class="amt negative">(₱{{ "{:,.2f}".format(bp.pi_ee) }})</span></div>
+      {% for loan in bp.loans %}
+      <div class="line"><span>{{ loan.loan_type }} (full balance)</span><span class="amt negative">(₱{{ "{:,.2f}".format(loan.outstanding_balance) }})</span></div>
+      {% endfor %}
+      <div class="line subtotal"><span>Total Deductions</span><span class="amt negative">(₱{{ "{:,.2f}".format(bp.total_ded) }})</span></div>
+    </div>
+  </div>
+  <div class="total-bar">
+    <div class="label">NET BACKPAY / FINAL PAY</div>
+    <div class="amount">₱{{ "{:,.2f}".format(bp.net_backpay) }}</div>
+  </div>
+  <div class="note">
+    This final pay computation covers unpaid wages, leave conversions, and statutory deductions as of {{ bp.last_day }}.
+    All outstanding loan balances have been deducted in full per company policy.
+    Prepared in accordance with DOLE Guidelines on Final Pay.
+  </div>
+  <div class="sig-grid">
+    <div><div class="sig-line">{{ bp.emp.last_name }}, {{ bp.emp.first_name }}<br>Employee — Received by</div></div>
+    <div><div class="sig-line">Authorized Signatory<br>HR / Finance</div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}Timesheet — {{ emp.last_name }}{% endblock %}
+{% block page_title %}Employee Timesheet{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('timekeeping.index') }}">Timekeeping</a> / {{ emp.employee_no }}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('timekeeping.adjustment_log') }}" class="btn btn-sm"><i class="ti ti-history"></i> Audit Log</a>
+<button class="btn btn-sm btn-primary" onclick="openModal('addEntryModal')"><i class="ti ti-plus"></i> Add Entry</button>
+{% endblock %}
+{% block content %}
+<div class="card mb-16">
+<div class="card-body" style="padding:12px 16px">
+<div class="d-flex gap-8 align-center flex-wrap">
+  <div class="d-flex align-center gap-8 flex-1">
+    <div class="emp-avatar" style="width:42px;height:42px;font-size:14px;background:#eff6ff;color:#1d4ed8;flex-shrink:0">{{ emp.last_name[0] }}{{ emp.first_name[0] }}</div>
+    <div>
+      <div class="fw-600" style="font-size:15px">{{ emp.last_name }}, {{ emp.first_name }}</div>
+      <div class="text-muted text-sm">{{ emp.employee_no }} · {{ emp.dept_name or emp.position_title or '—' }}</div>
+    </div>
+  </div>
+  <form method="get" class="d-flex gap-8 align-center">
+    <div class="form-group mb-0"><label class="form-label">From</label><input type="date" name="from" value="{{ date_from }}" class="form-control"></div>
+    <div class="form-group mb-0"><label class="form-label">To</label><input type="date" name="to" value="{{ date_to }}" class="form-control"></div>
+    <div style="margin-top:20px"><button type="submit" class="btn btn-primary"><i class="ti ti-search"></i></button></div>
+  </form>
+</div>
+</div></div>
+
+{% if totals %}
+<div class="stats-grid mb-16">
+<div class="stat-card"><div class="stat-icon blue"><i class="ti ti-calendar-check"></i></div><div class="stat-val">{{ totals.days or 0 }}</div><div class="stat-label">Days Present</div></div>
+<div class="stat-card"><div class="stat-icon green"><i class="ti ti-clock"></i></div><div class="stat-val">{{ "{:.1f}".format(totals.hours or 0) }}</div><div class="stat-label">Total Hours</div></div>
+<div class="stat-card"><div class="stat-icon amber"><i class="ti ti-clock-plus"></i></div><div class="stat-val">{{ "{:.1f}".format(totals.ot or 0) }}</div><div class="stat-label">OT Hours</div></div>
+<div class="stat-card"><div class="stat-icon red"><i class="ti ti-alarm"></i></div><div class="stat-val">{{ totals.late or 0 }}</div><div class="stat-label">Late (minutes)</div></div>
+</div>
+{% endif %}
+
+<div class="card">
+<div class="card-header"><div class="card-title">Timesheet — {{ date_from }} to {{ date_to }}</div></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Date</th><th>Time In</th><th>Time Out</th><th>Total Hrs</th><th>OT Hrs</th><th>Late (min)</th><th>Source</th><th>Adjustment</th><th class="no-print">Action</th></tr></thead>
+<tbody>
+{% for r in records %}
+<tr class="{{ 'table-warning' if r.adjustment_reason else '' }}" style="{{ 'background:#fffbeb' if r.adjustment_reason else '' }}">
+  <td class="font-mono fw-600">{{ r.work_date }}</td>
+  <td class="font-mono">{{ r.time_in or '—' }}</td>
+  <td class="font-mono">{{ r.time_out or '—' }}</td>
+  <td class="font-mono">{{ "{:.2f}".format(r.total_hours or 0) }}</td>
+  <td class="font-mono">{{ "{:.2f}".format(r.ot_hours or 0) if r.ot_hours else '—' }}</td>
+  <td>{% if r.late_minutes %}<span class="badge badge-amber">{{ r.late_minutes }}</span>{% else %}—{% endif %}</td>
+  <td><span class="badge badge-{{ 'blue' if r.source=='BIOMETRIC' else 'gray' }}">{{ r.source or 'MANUAL' }}</span></td>
+  <td class="text-sm text-muted">
+    {% if r.adjustment_reason %}
+    <i class="ti ti-edit" style="color:#b45309"></i> {{ r.adjustment_reason[:30] }}{% if r.adj_by_name %} <span class="text-muted">({{ r.adj_by_name }})</span>{% endif %}
+    {% else %}—{% endif %}
+  </td>
+  <td class="no-print">
+    <button class="btn btn-xs" onclick="openAdjust({{ r.id if r.id else 'null' }}, '{{ r.work_date }}', '{{ emp.id }}', '{{ r.time_in or '' }}', '{{ r.time_out or '' }}', {{ r.ot_hours or 0 }}, {{ r.late_minutes or 0 }})">
+      <i class="ti ti-edit"></i> Adjust
+    </button>
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="9" class="text-center" style="padding:24px;color:#6b7280">No records for this period.</td></tr>
+{% endfor %}
+</tbody>
+</table></div></div>
+
+<!-- Adjust Modal -->
+<div class="modal-backdrop" id="adjustModal">
+<div class="modal-dialog">
+  <div class="modal-header">
+    <div class="modal-title"><i class="ti ti-edit"></i> Adjust Attendance Record</div>
+    <button class="btn btn-xs" onclick="closeModal('adjustModal')"><i class="ti ti-x"></i></button>
+  </div>
+  <form id="adjustForm" method="post">
+    <input type="hidden" name="redirect_to" value="{{ url_for('timekeeping.timesheet', emp_id=emp.id, **{'from': date_from, 'to': date_to}) }}">
+  <div class="modal-body">
+    <div class="alert alert-info mb-16"><i class="ti ti-info-circle"></i> All adjustments are permanently logged in the audit trail.</div>
+    <div id="adjustDate" class="fw-600 mb-16" style="font-size:14px"></div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Time In</label><input type="time" name="time_in" id="adj_time_in" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Time Out</label><input type="time" name="time_out" id="adj_time_out" class="form-control"></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Override OT Hours (leave blank = auto)</label><input type="number" step="0.25" name="ot_hours" id="adj_ot" class="form-control" placeholder="auto"></div>
+      <div class="form-group"><label class="form-label">Override Late Minutes</label><input type="number" name="late_minutes" id="adj_late" class="form-control" placeholder="auto"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Reason for Adjustment *</label>
+      <textarea name="reason" class="form-control" rows="2" required placeholder="Required: explain why this record is being adjusted..."></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn" onclick="closeModal('adjustModal')">Cancel</button>
+    <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Save Adjustment</button>
+  </div>
+  </form>
+</div></div>
+
+<!-- Add New Entry Modal -->
+<div class="modal-backdrop" id="addEntryModal">
+<div class="modal-dialog">
+  <div class="modal-header">
+    <div class="modal-title"><i class="ti ti-plus"></i> Add Timesheet Entry</div>
+    <button class="btn btn-xs" onclick="closeModal('addEntryModal')"><i class="ti ti-x"></i></button>
+  </div>
+  <form method="post" action="{{ url_for('timekeeping.adjust_new', emp_id=emp.id, work_date='PLACEHOLDER') }}" id="addEntryForm">
+    <input type="hidden" name="redirect_to" value="{{ url_for('timekeeping.timesheet', emp_id=emp.id, **{'from': date_from, 'to': date_to}) }}">
+  <div class="modal-body">
+    <div class="form-group"><label class="form-label">Work Date *</label><input type="date" id="new_work_date" class="form-control" required></div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Time In</label><input type="time" name="time_in" class="form-control"></div>
+      <div class="form-group"><label class="form-label">Time Out</label><input type="time" name="time_out" class="form-control"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Reason *</label><textarea name="reason" class="form-control" rows="2" required placeholder="Required"></textarea></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn" onclick="closeModal('addEntryModal')">Cancel</button>
+    <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i> Add Entry</button>
+  </div>
+  </form>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function openAdjust(attId, date, empId, ti, to, ot, late) {
+  document.getElementById('adjustDate').textContent = 'Adjusting: ' + date;
+  document.getElementById('adj_time_in').value = ti;
+  document.getElementById('adj_time_out').value = to;
+  document.getElementById('adj_ot').value = ot || '';
+  document.getElementById('adj_late').value = late || '';
+  const form = document.getElementById('adjustForm');
+  if (attId) {
+    form.action = '/timekeeping/adjust/' + attId;
+  } else {
+    form.action = '/timekeeping/adjust/new/' + empId + '/' + date;
+  }
+  openModal('adjustModal');
+}
+document.getElementById('addEntryForm').addEventListener('submit', function(e) {
+  const d = document.getElementById('new_work_date').value;
+  if (!d) { e.preventDefault(); alert('Date is required'); return; }
+  this.action = this.action.replace('PLACEHOLDER', d);
+});
+</script>
+{% endblock %}

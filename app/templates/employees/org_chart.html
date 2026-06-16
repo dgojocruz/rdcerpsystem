@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% block title %}Org Chart{% endblock %}
+{% block page_title %}Organizational Chart{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('employees.index') }}">Employees</a> / Org Chart{% endblock %}
+{% block extra_css %}
+<style>
+#org-container{overflow:auto;background:#f9fafb;border:1px solid var(--border);border-radius:var(--radius);min-height:500px;padding:24px;position:relative}
+.org-node{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px;min-width:150px;max-width:190px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:box-shadow .15s;position:relative;flex-shrink:0}
+.org-node:hover{box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.org-node .emp-no{font-size:9px;color:#9ca3af;font-family:monospace}
+.org-node .emp-name{font-size:12px;font-weight:600;margin:3px 0;line-height:1.3}
+.org-node .emp-pos{font-size:10px;color:#6b7280;line-height:1.2}
+.org-node .emp-dept{font-size:9px;margin-top:4px;display:inline-block;padding:1px 6px;border-radius:10px;background:#eff6ff;color:#1d4ed8}
+.org-avatar{width:36px;height:36px;border-radius:50%;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;color:#fff}
+.org-level{display:flex;gap:16px;justify-content:center;position:relative}
+.org-level+.org-level{margin-top:40px}
+.connector-v{width:2px;height:30px;background:#e5e7eb;margin:0 auto}
+.connector-h-wrap{display:flex;position:relative;justify-content:center}
+.connector-h{height:2px;background:#e5e7eb;position:absolute;top:0}
+.no-manager-group{margin-top:24px;padding:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px}
+.search-box{margin-bottom:16px;display:flex;gap:8px;align-items:center}
+.dept-legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted)}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+.flat-list{display:none}
+</style>
+{% endblock %}
+{% block topbar_actions %}
+<div class="d-flex gap-8">
+  <button onclick="toggleView()" class="btn btn-sm" id="viewToggleBtn"><i class="ti ti-list"></i> List View</button>
+  <a href="{{ url_for('employees.index') }}" class="btn btn-sm"><i class="ti ti-arrow-left"></i> Back</a>
+</div>
+{% endblock %}
+{% block content %}
+<div class="card mb-16">
+<div class="card-body" style="padding:10px 16px">
+<div class="d-flex gap-8 align-center flex-wrap">
+  <input id="searchInput" class="form-control" style="width:220px" placeholder="Search by name or position..." oninput="filterNodes(this.value)">
+  <select id="deptFilter" class="form-control" style="width:160px" onchange="filterDept(this.value)">
+    <option value="">All Departments</option>
+  </select>
+  <div class="dept-legend" id="deptLegend"></div>
+</div>
+</div>
+</div>
+
+<div id="org-container">
+  <div id="org-tree"></div>
+</div>
+
+<div class="flat-list card" id="flatList">
+<div class="card-header"><div class="card-title">Employee List View</div></div>
+<div class="table-responsive"><table id="flatTable">
+<thead><tr><th>Employee No</th><th>Name</th><th>Position</th><th>Department</th><th>Reports To</th></tr></thead>
+<tbody id="flatBody"></tbody>
+</table></div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const empData = {{ employees_json | tojson }};
+
+const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#84CC16','#F97316','#6366F1'];
+const deptColors = {};
+let colorIdx = 0;
+function deptColor(dept) {
+  if (!dept) return '#9CA3AF';
+  if (!deptColors[dept]) deptColors[dept] = COLORS[colorIdx++ % COLORS.length];
+  return deptColors[dept];
+}
+
+function initials(last, first) {
+  return (last[0] || '') + (first[0] || '');
+}
+
+function buildTree() {
+  const byId = {};
+  empData.forEach(e => byId[e.id] = {...e, children: []});
+  const roots = [];
+  empData.forEach(e => {
+    if (e.manager_id && byId[e.manager_id]) {
+      byId[e.manager_id].children.push(byId[e.id]);
+    } else {
+      roots.push(byId[e.id]);
+    }
+  });
+  return {roots, byId};
+}
+
+function nodeHtml(emp) {
+  const color = deptColor(emp.dept_name);
+  return `<div class="org-node" id="node-${emp.id}" data-name="${emp.last_name} ${emp.first_name}" data-dept="${emp.dept_name||''}" data-pos="${emp.position_title||''}">
+    <div class="org-avatar" style="background:${color}">${initials(emp.last_name, emp.first_name)}</div>
+    <div class="emp-no">${emp.employee_no}</div>
+    <div class="emp-name">${emp.last_name}, ${emp.first_name}</div>
+    <div class="emp-pos">${emp.position_title||'No position'}</div>
+    <div class="emp-dept">${emp.dept_name||'—'}</div>
+  </div>`;
+}
+
+function renderSubtree(node) {
+  const wrap = document.createElement('div');
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.alignItems = 'center';
+
+  const nodeDiv = document.createElement('div');
+  nodeDiv.innerHTML = nodeHtml(node);
+  wrap.appendChild(nodeDiv);
+
+  if (node.children && node.children.length > 0) {
+    const vLine = document.createElement('div');
+    vLine.className = 'connector-v';
+    wrap.appendChild(vLine);
+
+    const childRow = document.createElement('div');
+    childRow.style.display = 'flex';
+    childRow.style.gap = '16px';
+    childRow.style.position = 'relative';
+
+    node.children.forEach(child => {
+      childRow.appendChild(renderSubtree(child));
+    });
+    wrap.appendChild(childRow);
+  }
+  return wrap;
+}
+
+function render() {
+  const {roots, byId} = buildTree();
+  const container = document.getElementById('org-tree');
+  container.innerHTML = '';
+
+  // Dept legend
+  const legend = document.getElementById('deptLegend');
+  const deptSelect = document.getElementById('deptFilter');
+  const depts = [...new Set(empData.map(e => e.dept_name).filter(Boolean))].sort();
+  depts.forEach(d => {
+    const col = deptColor(d);
+    legend.innerHTML += `<div class="legend-item"><div class="legend-dot" style="background:${col}"></div>${d}</div>`;
+    deptSelect.innerHTML += `<option value="${d}">${d}</option>`;
+  });
+
+  // Render managers with reports first
+  const managersWithReports = roots.filter(r => r.children.length > 0);
+  const noReports = roots.filter(r => r.children.length === 0);
+
+  if (managersWithReports.length > 0) {
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin-bottom:24px';
+    managersWithReports.forEach(root => {
+      topRow.appendChild(renderSubtree(root));
+    });
+    container.appendChild(topRow);
+  }
+
+  // Employees without a manager — show in a grid
+  if (noReports.length > 0) {
+    const group = document.createElement('div');
+    group.style.cssText = 'margin-top:16px;padding:16px;background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:11px;font-weight:600;color:#6b7280;margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em';
+    label.textContent = 'Employees — No Manager Assigned';
+    group.appendChild(label);
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px';
+    noReports.forEach(emp => {
+      const d = document.createElement('div');
+      d.innerHTML = nodeHtml(emp);
+      grid.appendChild(d);
+    });
+    group.appendChild(grid);
+    container.appendChild(group);
+  }
+
+  // Flat list
+  const flatBody = document.getElementById('flatBody');
+  empData.forEach(e => {
+    const mgr = e.manager_id ? byId[e.manager_id] : null;
+    flatBody.innerHTML += `<tr>
+      <td class="font-mono text-sm">${e.employee_no}</td>
+      <td class="fw-600">${e.last_name}, ${e.first_name}</td>
+      <td class="text-sm">${e.position_title||'—'}</td>
+      <td class="text-sm">${e.dept_name||'—'}</td>
+      <td class="text-sm text-muted">${mgr ? mgr.last_name+', '+mgr.first_name : '—'}</td>
+    </tr>`;
+  });
+}
+
+function filterNodes(q) {
+  document.querySelectorAll('.org-node').forEach(n => {
+    const name = n.dataset.name.toLowerCase();
+    const pos = n.dataset.pos.toLowerCase();
+    const match = !q || name.includes(q.toLowerCase()) || pos.includes(q.toLowerCase());
+    n.style.opacity = match ? '1' : '0.2';
+    n.style.transform = match ? 'scale(1)' : 'scale(0.9)';
+    n.style.transition = 'opacity .2s, transform .2s';
+  });
+}
+
+function filterDept(dept) {
+  document.querySelectorAll('.org-node').forEach(n => {
+    const match = !dept || n.dataset.dept === dept;
+    n.style.opacity = match ? '1' : '0.15';
+  });
+}
+
+let isListView = false;
+function toggleView() {
+  isListView = !isListView;
+  document.getElementById('org-container').style.display = isListView ? 'none' : 'block';
+  document.getElementById('flatList').style.display = isListView ? 'block' : 'none';
+  document.getElementById('viewToggleBtn').innerHTML = isListView
+    ? '<i class="ti ti-hierarchy"></i> Tree View'
+    : '<i class="ti ti-list"></i> List View';
+}
+
+render();
+</script>
+{% endblock %}

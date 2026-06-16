@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Alpha List{% endblock %}
+{% block page_title %}BIR Alpha List{% endblock %}
+{% block content %}
+<div class="card">
+<div class="card-header"><div class="card-title">Alphalist of Employees (1604C)</div><button class="btn btn-sm" onclick="window.print()"><i class="ti ti-printer"></i> Print</button></div>
+<div class="table-responsive"><table>
+<thead><tr><th>Last Name</th><th>First Name</th><th>Middle Name</th><th>TIN</th><th>Annual Gross</th><th>Annual W.Tax</th></tr></thead>
+<tbody>
+{% for r in records %}
+<tr>
+  <td>{{ r.last_name }}</td><td>{{ r.first_name }}</td><td>{{ r.middle_name or '' }}</td>
+  <td class="font-mono">{{ r.tin or '—' }}</td>
+  <td class="font-mono">₱{{ "{:,.2f}".format(r.annual_gross or 0) }}</td>
+  <td class="font-mono">{{ "₱{:,.2f}".format(r.annual_wtax) if r.annual_wtax else '—' }}</td>
+</tr>
+{% endfor %}
+</tbody></table></div></div>
+{% endblock %}
