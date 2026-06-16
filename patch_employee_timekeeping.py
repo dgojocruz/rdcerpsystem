@@ -1,5 +1,63 @@
-{% extends 'base.html' %}
-{% block title %}{{ emp.last_name }}, {{ emp.first_name }}
+import re
+
+# ── 1. Patch employees/__init__.py — add attendance query to view() ─────────
+py = open('app/modules/employees/__init__.py', encoding='utf-8').read()
+
+old_view_query = """    recent_payroll = g.db.execute(\"\"\"SELECT pr.*, pp.period_label FROM payroll pr
+        JOIN pay_periods pp ON pr.pay_period_id=pp.id
+        WHERE pr.employee_id=? ORDER BY pp.date_from DESC LIMIT 6\"\"\", (emp_id,)).fetchall()
+    departments = g.db.execute(\"SELECT * FROM departments WHERE is_active=1\").fetchall()
+    return render_template('employees/view.html', emp=emp, loans=loans, leaves=leaves,
+                           recent_payroll=recent_payroll, departments=departments)"""
+
+new_view_query = """    recent_payroll = g.db.execute(\"\"\"SELECT pr.*, pp.period_label FROM payroll pr
+        JOIN pay_periods pp ON pr.pay_period_id=pp.id
+        WHERE pr.employee_id=? ORDER BY pp.date_from DESC LIMIT 6\"\"\", (emp_id,)).fetchall()
+
+    # Timekeeping history
+    month_filter = request.args.get('tk_month', '')
+    tk_query = \"\"\"SELECT work_date, time_in, time_out, total_hours, regular_hours,
+        ot_hours, nd_hours, late_minutes, undertime_minutes,
+        is_absent, is_holiday, holiday_type, is_rest_day, source, remarks
+        FROM attendance WHERE employee_id=?\"\"\"
+    tk_params = [emp_id]
+    if month_filter:
+        tk_query += \" AND strftime('%Y-%m', work_date)=?\"
+        tk_params.append(month_filter)
+    tk_query += \" ORDER BY work_date DESC LIMIT 60\"
+    attendance_history = g.db.execute(tk_query, tk_params).fetchall()
+
+    # Attendance summary stats
+    tk_stats = g.db.execute(\"\"\"SELECT
+        COUNT(*) as total_days,
+        SUM(CASE WHEN is_absent=0 AND is_rest_day=0 AND is_holiday=0 THEN 1 ELSE 0 END) as present_days,
+        SUM(CASE WHEN is_absent=1 THEN 1 ELSE 0 END) as absent_days,
+        SUM(CASE WHEN late_minutes>0 THEN 1 ELSE 0 END) as late_days,
+        COALESCE(SUM(ot_hours),0) as total_ot,
+        COALESCE(SUM(late_minutes),0) as total_late_min,
+        COALESCE(SUM(total_hours),0) as total_hours_worked
+        FROM attendance WHERE employee_id=?
+        AND (? = '' OR strftime('%Y-%m', work_date)=?)
+    \"\"\", (emp_id, month_filter, month_filter)).fetchone()
+
+    departments = g.db.execute(\"SELECT * FROM departments WHERE is_active=1\").fetchall()
+    return render_template('employees/view.html', emp=emp, loans=loans, leaves=leaves,
+                           recent_payroll=recent_payroll, departments=departments,
+                           attendance_history=attendance_history, tk_stats=tk_stats,
+                           tk_month=month_filter)"""
+
+py = py.replace(old_view_query, new_view_query)
+open('app/modules/employees/__init__.py', 'w', encoding='utf-8').write(py)
+print("OK: employees/__init__.py patched")
+
+# ── 2. Patch view.html — add timekeeping tracker section ────────────────────
+html = open('app/templates/employees/view.html', encoding='utf-8').read()
+
+tk_section = """
+{% endblock %}
+"""
+
+new_tk_section = """
 <div class="card mt-16">
   <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
     <div class="card-title"><i class="ti ti-fingerprint"></i> Timekeeping History</div>
@@ -105,100 +163,9 @@
   {% endif %}
 </div>
 {% endblock %}
+"""
 
-{% block page_title %}{{ emp.last_name }}, {{ emp.first_name }}{% endblock %}
-{% block breadcrumb %}<a href="{{ url_for('employees.index') }}">Employees</a> / {{ emp.employee_no }}{% endblock %}
-{% block topbar_actions %}
-<a href="{{ url_for('employees.edit', emp_id=emp.id) }}" class="btn"><i class="ti ti-edit"></i> Edit</a>
-<a href="{{ url_for('payroll.backpay', emp_id=emp.id) }}" class="btn btn-danger"><i class="ti ti-file-text"></i> Backpay</a>
-{% endblock %}
-{% block content %}
-<div class="grid-2">
-<div class="card">
-  <div class="card-body">
-    <div class="d-flex align-center gap-8 mb-16">
-      <div class="emp-avatar" style="width:56px;height:56px;font-size:18px;background:#eff6ff;color:#1d4ed8">{{ emp.last_name[0] }}{{ emp.first_name[0] }}</div>
-      <div>
-        <div style="font-size:18px;font-weight:700">{{ emp.last_name }}, {{ emp.first_name }} {% if emp.middle_name %}{{ emp.middle_name }}{% endif %}</div>
-        <div class="text-muted">{{ emp.position_title or '—' }} · {{ emp.dept_name or '—' }}</div>
-        <div class="d-flex gap-8 mt-8">
-          <span class="badge badge-{{ 'green' if emp.status=='ACTIVE' else 'red' }}">{{ emp.status }}</span>
-          <span class="badge badge-blue">{{ emp.payroll_group }}</span>
-          <span class="badge badge-gray">{{ emp.tax_type }}</span>
-        </div>
-      </div>
-    </div>
-    <div class="section-divider">Employment Information</div>
-    {% for row in [
-      ('Employee No.', emp.employee_no),
-      ('Department', emp.dept_name or '—'),
-      ('Position', emp.position_title or '—'),
-      ('Dept. Type', emp.dept_type),
-      ('Employment Type', emp.employment_type),
-      ('Date Hired', emp.date_hired or '—'),
-      ('Payment Method', emp.payment_method),
-    ] %}
-    <div class="d-flex justify-between" style="padding:7px 0;border-bottom:1px solid #f3f4f6">
-      <span class="text-sm text-muted">{{ row[0] }}</span>
-      <span class="text-sm fw-600">{{ row[1] }}</span>
-    </div>
-    {% endfor %}
-    <div class="section-divider mt-16">Salary Details</div>
-    {% for row in [
-      ('Daily Rate', '₱' + "{:,.2f}".format(emp.daily_rate or 0)),
-      ('Hourly Rate', '₱' + "{:,.2f}".format(emp.hourly_rate or 0)),
-      ('Allowance', '₱' + "{:,.2f}".format(emp.allowance_amount or 0)),
-    ] %}
-    <div class="d-flex justify-between" style="padding:7px 0;border-bottom:1px solid #f3f4f6">
-      <span class="text-sm text-muted">{{ row[0] }}</span>
-      <span class="text-sm fw-600 font-mono">{{ row[1] }}</span>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-<div>
-  <div class="card mb-16">
-    <div class="card-header"><div class="card-title"><i class="ti ti-file-certificate"></i> Government IDs</div></div>
-    <div class="card-body">
-      {% for lbl, val in [('TIN', emp.tin), ('SSS', emp.sss_no), ('PhilHealth', emp.philhealth_no), ('Pag-IBIG', emp.pagibig_no)] %}
-      <div class="d-flex justify-between" style="padding:7px 0;border-bottom:1px solid #f3f4f6">
-        <span class="text-sm text-muted">{{ lbl }}</span>
-        <span class="text-sm font-mono">{{ val or '—' }}</span>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="card mb-16">
-    <div class="card-header"><div class="card-title"><i class="ti ti-calendar-off"></i> Leave Credits ({{ now().year if now is defined else '2026' }})</div></div>
-    <div class="table-responsive"><table>
-      <thead><tr><th>Type</th><th>Allocated</th><th>Used</th><th>Balance</th></tr></thead>
-      <tbody>
-      {% for lc in leaves %}
-      <tr>
-        <td>{{ lc.leave_type }}</td>
-        <td>{{ lc.allocated_days }}</td>
-        <td>{{ lc.used_days }}</td>
-        <td class="fw-600 text-success">{{ lc.balance_days }}</td>
-      </tr>
-      {% else %}<tr><td colspan="4" class="text-center text-muted">No leave credits</td></tr>{% endfor %}
-      </tbody>
-    </table></div>
-  </div>
-  <div class="card">
-    <div class="card-header"><div class="card-title"><i class="ti ti-cash"></i> Recent Payslips</div></div>
-    <div class="table-responsive"><table>
-      <thead><tr><th>Period</th><th>Gross</th><th>Net Pay</th></tr></thead>
-      <tbody>
-      {% for pr in recent_payroll %}
-      <tr>
-        <td class="text-sm">{{ pr.period_label }}</td>
-        <td class="font-mono text-sm">₱{{ "{:,.2f}".format(pr.gross_salary or 0) }}</td>
-        <td class="font-mono text-sm fw-600 text-primary">₱{{ "{:,.2f}".format(pr.net_pay or 0) }}</td>
-      </tr>
-      {% else %}<tr><td colspan="3" class="text-center text-muted">No payroll records</td></tr>{% endfor %}
-      </tbody>
-    </table></div>
-  </div>
-</div>
-</div>
-{% endblock %}
+html = html.replace("{% endblock %}", new_tk_section, 1)
+open('app/templates/employees/view.html', 'w', encoding='utf-8').write(html)
+print("OK: employees/view.html patched")
+print("\nDone! Restart the server and open any employee profile to see the Timekeeping History section.")

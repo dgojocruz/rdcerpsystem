@@ -1,0 +1,1 @@
+print(open('app/modules/dashboard/__init__.py', encoding='utf-8').read())

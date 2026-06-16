@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, g, jsonify, flash, current_app, send_file
+﻿from flask import Blueprint, render_template, request, redirect, url_for, g, jsonify, flash, current_app, send_file
 from ..auth import login_required
 import os, io, json
 
@@ -116,38 +116,9 @@ def view(emp_id):
     recent_payroll = g.db.execute("""SELECT pr.*, pp.period_label FROM payroll pr
         JOIN pay_periods pp ON pr.pay_period_id=pp.id
         WHERE pr.employee_id=? ORDER BY pp.date_from DESC LIMIT 6""", (emp_id,)).fetchall()
-
-    # Timekeeping history
-    month_filter = request.args.get('tk_month', '')
-    tk_query = """SELECT work_date, time_in, time_out, total_hours, regular_hours,
-        ot_hours, nd_hours, late_minutes, undertime_minutes,
-        is_absent, is_holiday, holiday_type, is_rest_day, source, remarks
-        FROM attendance WHERE employee_id=?"""
-    tk_params = [emp_id]
-    if month_filter:
-        tk_query += " AND strftime('%Y-%m', work_date)=?"
-        tk_params.append(month_filter)
-    tk_query += " ORDER BY work_date DESC LIMIT 60"
-    attendance_history = g.db.execute(tk_query, tk_params).fetchall()
-
-    # Attendance summary stats
-    tk_stats = g.db.execute("""SELECT
-        COUNT(*) as total_days,
-        SUM(CASE WHEN is_absent=0 AND is_rest_day=0 AND is_holiday=0 THEN 1 ELSE 0 END) as present_days,
-        SUM(CASE WHEN is_absent=1 THEN 1 ELSE 0 END) as absent_days,
-        SUM(CASE WHEN late_minutes>0 THEN 1 ELSE 0 END) as late_days,
-        COALESCE(SUM(ot_hours),0) as total_ot,
-        COALESCE(SUM(late_minutes),0) as total_late_min,
-        COALESCE(SUM(total_hours),0) as total_hours_worked
-        FROM attendance WHERE employee_id=?
-        AND (? = '' OR strftime('%Y-%m', work_date)=?)
-    """, (emp_id, month_filter, month_filter)).fetchone()
-
     departments = g.db.execute("SELECT * FROM departments WHERE is_active=1").fetchall()
     return render_template('employees/view.html', emp=emp, loans=loans, leaves=leaves,
-                           recent_payroll=recent_payroll, departments=departments,
-                           attendance_history=attendance_history, tk_stats=tk_stats,
-                           tk_month=month_filter)
+                           recent_payroll=recent_payroll, departments=departments)
 
 @bp.route('/<int:emp_id>/edit', methods=['GET','POST'])
 @login_required
@@ -328,3 +299,4 @@ def download_template():
     wb.save(buf); buf.seek(0)
     return send_file(buf, as_attachment=True, download_name='employee_import_template.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
